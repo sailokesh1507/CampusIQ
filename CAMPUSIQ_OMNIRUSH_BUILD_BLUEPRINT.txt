@@ -1,0 +1,279 @@
+# CAMPUSIQ — OMNIRUSH IMPLEMENTATION BLUEPRINT
+
+Version: 1.0 | Planning artifact only | Challenge: KPMG in India, Challenge 4
+
+## 1. Executive build brief
+
+CampusIQ is a Student Success Intelligence Platform for faculty and college administrators. It unifies campus signals, calculates a transparent illustrative Student Success Score, highlights students who may benefit from academic or placement support, and turns those findings into faculty-reviewed interventions. Its differentiator is the full decision-support loop: Data -> Insight -> Explanation -> Recommended Action -> Follow-up -> Outcome tracking; it is not merely a chart dashboard.
+
+Done for this 22-hour hackathon means a deployed, working prototype using clearly labelled synthetic data, a reliable data import path, deterministic score/risk logic, interactive cohort and student views, and a persisted intervention workflow. It must demonstrate the official KPMG deliverables, not claim clinical-grade prediction or validated future outcomes.
+
+[OFFICIAL Round 1 operations from the screenshots] The round is a 24-hour physical hackathon: the first two hours are for understanding/locking a problem statement and the following 22 hours are for build, test and deployment. Submission requires the deployed solution, GitHub repository, and required project details. Evaluation includes automated checks followed by human evaluation; the top 50 teams overall advance to Round 2 in Hyderabad. Treat deployed app, repository readiness and honest runnable instructions as submission-critical P0 work.
+
+Target journey: an administrator loads the synthetic data or imports a validated CSV; the platform normalizes it by stable student_id; dashboard metrics and cohort trends recalculate; the administrator filters a priority segment; opens a student to inspect score inputs, coverage, support signals and explanation; then creates, assigns, and updates a follow-up intervention. Faculty retain judgment at every decision point.
+
+In scope: the seven official data domains, integrated view, score, support/risk identification for academic and placement outcomes, interactive dashboard, segmentation, explainability, CSV validation, synthetic demo data, intervention persistence, deployment, and demo assets. Explicitly out of scope in 22 hours: production SIS/LMS integrations, biometric attendance, real personally identifiable student data, authentication/SSO, automated adverse decisions, retrained predictive ML, production governance certification, notifications, and a dependency on an LLM.
+
+Official requirement vs proposed enhancement: requirements labelled [OFFICIAL] are taken from the supplied screenshots. Items labelled [PROPOSED] are product choices that make the official brief demonstrable; they are not asserted as KPMG requirements.
+
+## 2. Rubric traceability matrix
+
+| Source / requirement | Feature and implementation task | Planned modules | Acceptance test | Demo moment | Priority |
+|---|---|---|---|---|---|
+| [OFFICIAL] Academic integration: CGPA, marks, backlogs, subject performance | Normalized student, academic snapshot, optional subject rows; unified CSV importer | db/schema, import/validators, analytics/normalizers | Valid rows appear under the correct stable student_id; invalid CGPA/ranges are rejected | Inspect a profile's academic evidence | P0 |
+| [OFFICIAL] Attendance integration: overall and subject-wise | Store overall attendance and optional subject attendance | schema, imports, profile | Overall/subject values reconcile in profile and filters | Show attendance driver | P0 |
+| [OFFICIAL] LMS: login frequency, assignment completion | Import/store LMS period metrics and normalize them | schema, imports, scoring | Login/completion update learning component after refresh | Explain learning driver | P0 |
+| [OFFICIAL] Engagement: events, clubs, hackathons, certifications | Engagement counts/records attached by student_id | schema, imports, segments | Imported engagement is visible and affects only its documented component | Compare engaged cohorts | P0 |
+| [OFFICIAL] Placement: aptitude, coding, mock interviews | Placement assessment snapshot and readiness component | schema, scoring, profile | Known scores produce exact readiness result | Filter placement-readiness gap | P0 |
+| [OFFICIAL] Skills: technical and soft-skill assessments | Skills snapshot with two bounded values | schema, imports, scoring | Scores validate and appear in evidence | Show skill context | P0 |
+| [OFFICIAL] Feedback: satisfaction and faculty feedback | Feedback snapshot, qualitative note sanitized/displayed as context, excluded from score | schema, imports, profile | Feedback imports and never silently changes score | Show contextual feedback | P0 |
+| [OFFICIAL] Student Success Score using academic and engagement indicators | Deterministic 0–100 weighted calculation with coverage | analytics/scoring, tests | Fixed fixture returns expected rounded score and explanation | Open score methodology and a profile | P0 |
+| [OFFICIAL] Identify at-risk students: poor academic performance | Academic-support signal and non-stigmatizing review status | analytics/risk, explorer | Boundary fixtures set/clear flag correctly | Filter “Academic support opportunity” | P0 |
+| [OFFICIAL] Identify at-risk students: poor placement outcomes | Placement-readiness-gap signal | analytics/risk, explorer | Low readiness fixture receives flag | Filter placement gap | P0 |
+| [OFFICIAL] Interactive faculty/admin dashboard: scores, risk flags, trends, insights | Overview cards, filters, charts/table, review queue; all derived from API | dashboard UI, dashboard API | Each filter changes records, cards and charts consistently | Filter a cohort and observe all KPIs change | P0 |
+| [OFFICIAL bonus] Meaningful student segmentation, including high academics/low placement readiness | Deterministic segment rules with reasons | analytics/segments, segments UI | Fixture appears in named segment and exposes reasons | Select the gap segment | P1 |
+| [OFFICIAL bonus] Explainable score: drivers of score and risk flag | Component contributions and rule evidence | analytics/explain, profile UI | Sum/contributions reconcile to displayed score; flags cite source rule | Inspect driver chips and evidence | P1 |
+| [OFFICIAL deliverable] Working dashboard on integrated data | Seed/load plus dashboard build | seed, app, README | Fresh install loads/ imports data and shows live metrics | Start demo at overview | P0 |
+| [OFFICIAL deliverable] Short score explanation | Methodology page and score note | methodology UI, docs | Formula, inputs, exclusions, coverage and limitations are visible | Explain formula in 30 seconds | P0 |
+| [OFFICIAL deliverable] Short demo or slides | 3–5 minute script and small slide outline | docs/demo-script, docs/slides-outline | Script traverses a real running app | Deliver closing walkthrough | P0 |
+| [OFFICIAL Round 1] Submit deployed solution, GitHub repository and required project details | Deploy early; prepare README, environment template and submission checklist | README, deploy config, docs/submission-checklist | Hosted smoke test and clean repository review pass | Open deployed URL and show repository setup | P0 |
+| [OFFICIAL Round 1] Automated checks followed by human evaluation | Reproducible build/test commands, validation/error states and concise contextual demo | package scripts, tests, README, demo assets | Fresh build/test plus manual rubric walkthrough | State both evidence and campus context | P0 |
+| [OFFICIAL rubric] Data Integration & Analysis — 30% | Source provenance, validation/errors, unified views, meaningful combined-data insights | imports, schema, dashboard | Import-to-dashboard integration test | Show import validation and cohort metrics | P0 |
+| [OFFICIAL rubric] Success Score & Risk Identification — 25% | Sensible documented rules, score, support flags, explainability | scoring, risk, tests | Unit boundary suite passes | Explain a flagged student | P0 |
+| [OFFICIAL rubric] Dashboard & Visualization — 25% | Clear interactive, accessible faculty/admin views | UI, e2e | Filter/sort/search e2e passes | Overview to explorer | P0 |
+| [OFFICIAL rubric] Problem Understanding — 10% | Campus-context copy, human review, privacy, action workflow | about, interventions, demo | Review confirms no deterministic disciplinary claim | Frame the problem and safeguards | P0 |
+| [OFFICIAL rubric] Presentation & Demo — 10% | Deployed prototype, concise demo and slides | deploy, docs | Hosted smoke test and timed rehearsal | Full 3–5 minute flow | P0 |
+| [OFFICIAL bonus credit] Segmentation contributes under Success Score & Risk Identification | Explain segment criteria and targeted action | segments, profile | Reason list is visible | Create targeted intervention | P1 |
+| [OFFICIAL bonus credit] Explainability contributes under Dashboard & Visualization | Surface visible score/risk drivers | profile, methodology | Explanation reflects raw evidence | Driver drill-down | P1 |
+
+Official weighting is 100 base points: Data Integration & Analysis 30%, Success Score & Risk Identification 25%, Dashboard & Visualization 25%, Problem Understanding 10%, Presentation & Demo 10%. The screenshots state bonus credit is added in the relevant criteria, with segmentation mapped to Success Score & Risk Identification and explainable score mapped to Dashboard & Visualization, capped at approximately 5–10 points total. Do not invent a separate bonus scale.
+
+## 3. Repository reconnaissance and stack decision
+
+Observed on 2026-10-12: the current workspace contained only a .git directory. `git status --short --branch` reported “No commits yet on main”; no README, source, package manifest, test/configuration/deployment files, or uncommitted user files were visible. Consequently no runtime, package manager, framework, test command, or hosting convention can be confirmed.
+
+[PROPOSED] Use one TypeScript monorepo-like application, without services split across repositories:
+
+* Node.js 20 LTS + npm (assumption; verify `node --version` and `npm --version`).
+* React + Vite + TypeScript client; Express + TypeScript API in the same repository.
+* SQLite via better-sqlite3 for a portable single-file database; Zod for request/CSV validation; a lightweight chart library only after the core table works; Vitest for unit/integration tests and Playwright only if time permits.
+* The Express server serves the Vite production build, yielding one deployable service and no paid dependency.
+
+Rationale: it is easy to seed, inspect, persist locally, test deterministically, and deploy as one container/service. Avoid a separate frontend deployment, external API, ORM migration complexity, and fabricated AI. Expected commands after implementation (assumptions): `npm install`, `npm run dev`, `npm run build`, `npm start`, `npm test`, and `npm run test:e2e`. Environment: `PORT=3000`, `DATABASE_PATH=./data/campusiq.db`, `NODE_ENV`, `APP_BASE_URL`; optional `AI_INSIGHTS_PROVIDER` and `AI_API_KEY` are never required and must be absent from committed files.
+
+Fallback: if native SQLite bindings fail in the host, use a pure JavaScript SQL-compatible local persistence library or a JSON repository behind the same repository interface for the prototype; document its limitations. If deployment storage is unavailable, deploy the seeded read-only demo plus server memory/ephemeral SQLite and state that intervention persistence is guaranteed for the running instance but not across redeploys; preserve the full local persistent demo as the submission fallback. Never pretend durable hosted storage exists when it does not.
+
+## 4. System architecture
+
+Responsibilities: React owns view state and calls typed HTTP endpoints. Express owns validation, import orchestration, analytics refresh and CRUD. SQLite owns normalized source records, imports, score snapshots and interventions. Analytics is a pure deterministic module invoked after import/seed and on refresh. The optional insight adapter receives only aggregate/approved minimised facts; its deterministic fallback works offline.
+
+```mermaid
+flowchart LR
+  U[Faculty / Administrator] --> UI[React responsive UI]
+  UI --> API[Express API]
+  CSV[Unified + domain CSV files] --> VAL[CSV parser + Zod validation]
+  VAL --> NORM[Normalization + stable student_id matching]
+  NORM --> DB[(SQLite: source data, imports, interventions)]
+  API --> DB
+  DB --> ANA[Deterministic scoring, risk, segments]
+  ANA --> DB
+  API --> UI
+  ANA --> SAFE[Aggregate/minimised insight payload]
+  SAFE --> LLM[Optional LLM adapter]
+  LLM --> API
+  API --> DEPLOY[Single Node service deployment]
+```
+
+Data flow: upload -> parse headers -> validate cells and student IDs -> stage rows -> reject invalid rows with row-level errors; only commit a batch atomically if the chosen mode has no blocking errors (or explicitly commit valid rows in “partial import” mode with a visible summary) -> normalize values -> recalculate analytics -> persist snapshot/provenance -> return import result -> invalidate/refetch dashboard queries. An intervention stores the observed signal, score snapshot ID and faculty rationale, then changes status/notes through normal CRUD. If optional AI fails or has no key, the UI uses a labelled deterministic summary based on the same calculated aggregates.
+
+## 5. Information architecture and UX specification
+
+Design direction: calm enterprise analytics, generous whitespace, compact cards, strong typography, data-dense tables, blue/teal neutral palette, amber/red only for review priority, and no stigmatizing red “failure” labels. Provide keyboard focus, text equivalents for charts, sufficient contrast, responsive stacked cards/table-to-card transformation, and an always-visible “Synthetic demo data / heuristic decision support” disclosure.
+
+1. Executive Overview — purpose: triage cohort health. Show total assessed, coverage, median score, counts by review priority, academic/attendance/placement signals, trend only when dated history exists, segment distribution, review queue, global programme/semester/department filters, and import/refresh affordance. Filters update every card/chart/table from `GET /api/dashboard`. Loading shows skeletons; zero students offers Load Demo/Import; error offers retry; mobile stacks cards then list.
+2. Students Explorer — searchable, sortable, paginated table/cards with score, coverage, support signals, segments, latest intervention and last updated. Filters include department, programme, semester, score band, coverage, signal and segment. URL/query state drives `GET /api/students`; reset filters and empty-result guidance are required.
+3. Student Detail/Profile — identity/minimal cohort context, source records, score gauge plus component contributions, data coverage, support signals with rule evidence, segment memberships/reasons, placement readiness, feedback context, intervention timeline and Create Intervention. Feed `GET /api/students/:id`; independently load/update interventions. Missing domain values show “not supplied,” never 0.
+4. Data Import/Integration Center — download unified/template CSVs, upload preview, source type selection, row error table, commit choice, batch history/provenance, and refresh analytics. Use `GET /api/import/templates/:type`, `POST /api/imports/validate`, `POST /api/imports/commit`, `GET /api/imports`. Disable commit until validation result is explicit.
+5. Segmentation/Cohort Analysis — segment counts, drillable cohorts, segment definition and reasons, comparisons of score/components and recommended faculty-review prompts. Feed `GET /api/segments`; empty/insufficient-data states explain why no inference was made.
+6. Intervention Workbench — queue with status/owner/due filters, create/edit drawer, notes timeline, and links back to student/source signals. Feed intervention CRUD routes. Confirm saving, validate required category/owner/due status, and preserve reload persistence.
+7. Scoring Methodology/About Data — literal formula, scale metadata requirement, missing-data rules, thresholds, sources, limitations, privacy, “heuristic not a validated prediction,” synthetic-data label and provenance. Feed static content plus `GET /api/methodology` to prevent drift.
+
+## 6. Data model and data dictionary
+
+Use UTC ISO timestamps, UUID primary keys unless stated, and parameterized SQL. `student_id` is a stable external string (not name) unique case-insensitively; source name/raw row and import_batch_id preserve provenance. Index all `student_id`, foreign keys, `(student_id, observed_at DESC)`, intervention status/due date, and import batch status.
+
+* `students(id, student_id UNIQUE NOT NULL, display_name, email nullable, department, programme, semester INTEGER 1..12 nullable, active BOOLEAN, created_at, updated_at)`. Display name/email are demo/minimum data only; never join by either.
+* `academic_metrics(id, student_id FK, observed_at, cgpa DECIMAL nullable, cgpa_scale DECIMAL nullable, marks_percent DECIMAL 0..100 nullable, backlogs INTEGER >=0 nullable, source_batch_id FK, UNIQUE(student_id, observed_at))`; `subject_assessments(id, student_id FK, subject_code, percent 0..100, attendance_percent nullable, observed_at, source_batch_id)`.
+* `attendance_metrics(id, student_id FK, observed_at, overall_percent 0..100 nullable, source_batch_id)` and optional `subject_attendance(id, student_id FK, subject_code, percent 0..100, observed_at)`.
+* `lms_metrics(id, student_id FK, observed_at, login_count INTEGER >=0 nullable, assignment_completion_percent 0..100 nullable, source_batch_id)`.
+* `engagement_metrics(id, student_id FK, observed_at, events_count INTEGER >=0 nullable, clubs_count INTEGER >=0 nullable, hackathons_count INTEGER >=0 nullable, certifications_count INTEGER >=0 nullable, source_batch_id)`.
+* `placement_metrics(id, student_id FK, observed_at, aptitude_score 0..100 nullable, coding_score 0..100 nullable, mock_interview_score 0..100 nullable, source_batch_id)`; `skills_metrics(id, student_id FK, observed_at, technical_score 0..100 nullable, soft_skill_score 0..100 nullable, source_batch_id)`.
+* `feedback(id, student_id FK, observed_at, student_satisfaction 1..5 nullable, faculty_feedback TEXT nullable, source_batch_id)`. Treat free text as displayed context; it is not sent to an LLM by default and does not change score.
+* `score_snapshots(id, student_id FK, calculated_at, success_score 0..100 nullable, coverage_percent 0..100, academic_component nullable, attendance_component nullable, learning_component nullable, placement_component nullable, support_level ENUM(insufficient,none,watch,needs_review), explanation_json, algorithm_version, UNIQUE(student_id, algorithm_version, calculated_at))`.
+* `interventions(id, student_id FK, score_snapshot_id FK nullable, category ENUM(academic,attendance,learning,placement,wellbeing_referral,other), title, rationale, owner, due_date, status ENUM(open,in_progress,completed,cancelled), created_at, updated_at)`; `intervention_notes(id, intervention_id FK, body, author, created_at)`.
+* `import_batches(id, source_type, filename, status ENUM(validating,validated,committed,failed), total_rows, accepted_rows, rejected_rows, imported_at, initiated_by)` and `import_errors(id, batch_id FK, row_number, field, code, message, raw_value)`.
+
+Initial supported unified CSV (P0): `student_id,display_name,department,programme,semester,observed_at,cgpa,cgpa_scale,marks_percent,backlogs,attendance_percent,lms_login_count,assignment_completion_percent,events_count,clubs_count,hackathons_count,certifications_count,aptitude_score,coding_score,mock_interview_score,technical_skill_score,soft_skill_score,student_satisfaction,faculty_feedback`. Required: student_id, observed_at, and at least one measurable domain value; display_name is optional. Optional P1 domain templates: academic (`student_id,observed_at,cgpa,cgpa_scale,marks_percent,backlogs`), attendance (`student_id,observed_at,overall_percent`), LMS (`student_id,observed_at,login_count,assignment_completion_percent`), placement and skills as named fields. Templates include a second comment/example file only if CSV tooling supports it cleanly.
+
+Rules: duplicate `student_id` in students upserts the same student after a clear preview; duplicate `(student_id, observed_at, domain)` is a blocking conflict unless user explicitly selects replacement and sees the affected count. Unknown IDs in domain-specific imports are rejected (do not auto-create a student without cohort context). Invalid headers/types/out-of-range values are row-level errors; invalid required fields block the row. Blank optional fields become NULL; they never become zero. In atomic mode any rejected row blocks commit; P1 partial mode commits only valid rows after a confirmation and retains errors. A batch is immutable after commit.
+
+## 7. Student Success Score and risk logic
+
+Algorithm version `heuristic-v1`; all output is deterministic, bounded 0–100, rounded only at display (one decimal), and illustrative rather than predictive or causal.
+
+Component weights: Academic 35%, Attendance 25%, Learning & engagement 15%, Placement readiness 25%. This preserves the suggested, sensible balance while satisfying the official requirement to use academic and engagement indicators. Feedback is excluded to avoid treating sentiment as achievement; skills form 10% of Learning & engagement. For each component, calculate only from supplied valid subfields and reweight the component's available subweights.
+
+* Academic: CGPA normalized as `100 * cgpa / cgpa_scale`, only when both values exist and `cgpa_scale > 0`; marks/subject result is 0–100. Base = 60% normalized CGPA + 40% marks/subject average, reweighted if only one exists. `academic = clamp(base - min(20, 5 * backlogs), 0, 100)`. Backlogs are therefore one capped score adjustment; the backlog support flag does not reduce score again.
+* Attendance: overall percent, otherwise mean of subject percents, otherwise absent.
+* Learning & engagement: LMS = 50% `min(login_count/20,1)*100` + 50% assignment completion; engagement = 40% `min((events+clubs+hackathons)/6,1)*100` + 60% `min(certifications/3,1)*100`; skills = mean technical/soft skill. Component = 60% LMS + 25% engagement + 15% skills, reweighted across available groups.
+* Placement readiness: 40% aptitude + 35% coding + 25% mock interview, reweighted when tests are present.
+* Let `Wpresent` be the sum of top-level component weights whose component exists. Coverage = `100 * Wpresent / 100`. If coverage <60%, success score is NULL and support level is `insufficient` (domain flags based on present evidence may still show as “evidence to review”). Otherwise `score = sum(component * componentWeight) / Wpresent`.
+
+Never assume a 10-point CGPA scale: importer demands `cgpa_scale`; it can be 4, 10, or another positive declared scale. If it is absent, CGPA is excluded and explained. No historical slope/trend is inferred unless at least two dated snapshots exist.
+
+Independent review signals: Academic support opportunity if academic <55 OR normalized CGPA <50 OR marks <50 OR backlogs >=2; Attendance support if attendance <75; Learning engagement review if learning <50; Placement readiness gap if placement <55 OR two supplied placement subtests <50. `needs_review` if score <50 with coverage >=60 or at least three signals; `watch` if score <60 or two signals; `none` otherwise. These thresholds are visible heuristic triage rules, never disciplinary labels, and are subject to human review.
+
+Explanation: return inputs used/absent, raw normalized values, component value and weighted contribution (`component * weight / Wpresent`), backlog adjustment, coverage, every matching signal/rule, and plain-language text generated from templates. This prevents an LLM from inventing reasons. Unit tests: 10/10 CGPA and 100s -> 100; lower/upper clamps; 4-point scale; missing scale; all components absent; 59 vs 60 coverage; 74.9/75 attendance; 54.9/55 placement; 1/2 backlogs; exact repeatability; contributions reconcile within rounding.
+
+## 8. Segmentation and cohort insights
+
+Segments are deterministic labels with a reason array, not exclusive diagnoses. A student may be in several segments; cards state overlaps and explorer filters use OR/AND explicitly. If coverage <60%, assign only `Insufficient data to assess` and do not infer performance segment.
+
+* High academic, low placement readiness: academic >=75 AND placement <55.
+* Attendance and academic support opportunity: attendance <75 AND (academic <55 OR a dated academic delta <= -8 points over at least 30 days); omit the decline condition if no history.
+* Placement-ready, academic support need: placement >=70 AND academic <55.
+* Consistently strong: coverage >=80, academic >=75, attendance >=80, learning >=65, placement >=70, no support signals; “consistent” requires two qualifying dated snapshots at least 30 days apart, otherwise label `Current strong performance`.
+* Insufficient data: coverage <60.
+
+Each segment response exposes values and thresholds that fired. Cohort cards show count, percent, component median and sample-size label; no trend chart renders without valid history.
+
+## 9. Intervention workbench
+
+[PROPOSED] Categories: academic coaching, attendance outreach, LMS/learning plan, placement preparation, wellbeing referral, other. Required create fields: student, category, concise title, observed-signal rationale, owner, due date and status. Optional: linked score snapshot, recommended next step, notes. Status is Open -> In progress -> Completed or Cancelled; every change writes a history note with actor/time. Faculty may override recommendation and must supply their own rationale.
+
+Validation: student must exist; owner/title/rationale nonblank; due date is valid and not before creation (warn rather than block overdue edits); enum/status transitions valid; notes max 2,000 characters and sanitized. Acceptance: create a placement-prep intervention for a filtered student, reload, find it in workbench/profile, add a follow-up note, change to In progress then Completed, and confirm timestamped history persists. No automated outreach is sent.
+
+## 10. Optional AI insight layer
+
+Implement only after P0/P1 pass. Interface: `generateCohortInsight({filters, cohortCount, medians, segmentCounts, signalCounts, dataCoverage, generatedAt}): InsightResult`. Send aggregate counts/medians only; no names, student IDs, email or feedback text. Require JSON with 1–3 concise findings, each containing a metric reference from supplied keys and one faculty-review suggestion. Validate schema, reject unsupported claims, time out quickly, rate-limit, and label output “AI-generated, verify against metrics.”
+
+With missing key/provider, malformed JSON, timeout, or rate limit, return a deterministic template such as “12 of 40 assessed students have an attendance support signal (30%). Review the attendance cohort.” Mark it “Calculated insight,” not AI. Score, flags, segments and all CRUD remain fully usable offline.
+
+## 11. API and state contracts
+
+All responses use `{data, meta?}`; failures use `{error:{code,message,fieldErrors?,requestId}}` with 400 validation, 404 not found, 409 conflict, 413 upload too large, 422 semantic row validation, and 500 safe internal error. Use page/pageSize (max 100), sort allowlists, and parameterized filters.
+
+* `GET /api/dashboard?department=&programme=&semester=&segment=` -> KPIs, distributions, current cohort rows, `filtersApplied`; UI query/cache owns filters.
+* `GET /api/students?q=&signal=&segment=&minScore=&maxScore=&page=&pageSize=&sort=` -> `{items:[StudentSummary], total}`; `GET /api/students/:studentId` -> profile, latest source values, score explanation, segments, interventions.
+* `GET /api/import/templates/:type` streams documented CSV; `POST /api/imports/validate` multipart `{file,sourceType,mode}` -> batch preview/errors; `POST /api/imports/:batchId/commit` -> committed counts/recalculation status; `GET /api/imports` -> history; `GET /api/imports/:batchId/errors` -> pagination.
+* `POST /api/analytics/refresh` -> recalculated students/count/version; only called after confirmed write or explicit UI command.
+* `GET /api/segments?filters...` -> definitions, cohort summaries, students/reasons; `GET /api/methodology` -> version, weights, thresholds and limitations.
+* `GET /api/interventions?...`, `POST /api/interventions`, `PATCH /api/interventions/:id`, `POST /api/interventions/:id/notes`; payloads conform to the validation above and return persisted records.
+* `POST /api/insights/cohort` -> validated AI/fallback result and `source: ai|deterministic`.
+
+The frontend owns ephemeral dialogs, table/filter state and fetch lifecycle; backend/database own source truth and derived snapshots. On committed import/intervention mutation, invalidate the affected query keys and refetch; do not mutate dashboard totals optimistically without reconciliation.
+
+## 12. Exact repository tree and file responsibilities
+
+Proposed tree (create only during implementation; reconcile with actual repo first):
+
+```text
+campusiq/
+  package.json  tsconfig.json  vite.config.ts  .env.example  .gitignore
+  README.md  Dockerfile  render.yaml
+  src/client/{main.tsx,App.tsx,api/client.ts,components/,pages/,styles/}
+  src/server/{index.ts,app.ts,routes/,middleware/,repositories/,services/}
+  src/shared/{types.ts,schemas.ts,methodology.ts}
+  src/analytics/{normalize.ts,scoring.ts,risk.ts,segments.ts,explain.ts,insights.ts}
+  src/db/{connection.ts,schema.sql,migrations/,seed.ts,seed-data/}
+  src/import/{csv.ts,templates.ts,validators.ts,commit.ts}
+  tests/{unit/,integration/,e2e/,fixtures/}
+  docs/{architecture.md,data-dictionary.md,score-methodology.md,demo-script.md,slides-outline.md}
+```
+
+`src/shared` imports nothing app-specific and defines contracts. `analytics` imports shared types only; it is pure and unit-tested. `db/repositories` imports db/shared but never UI. `import` calls schemas/repositories/analytics refresh and records errors. `services` coordinate repositories, import and analytics; routes are thin adapters. Client `api` calls routes; pages compose components; components never access SQL. `schema.sql`/migrations define constraints; `seed-data` contains only synthetic labelled datasets; `seed.ts` is idempotent. Unit tests cover analytics/import validators; integration tests exercise database/API flow; e2e tests cover UI journey. Dockerfile/render config and `.env.example` are deployment-only; no secrets are embedded.
+
+## 13. Exact 22-hour execution plan
+
+| Hours | Milestone/work | Dependencies and definition of done | Checkpoint / cut rule |
+|---|---|---|---|
+| 0–1 | Recon, baseline, choose stack, write checklist | Existing files preserved; app skeleton decision recorded | Run baseline commands; if setup fails, reduce libraries |
+| 1–3 | Schema, migrations, repository, synthetic fixtures | DB seeds 40–60 clearly synthetic students across all edge cases | Query counts/foreign keys; cut optional subject tables first |
+| 3–5 | Unified CSV validation/import + batch errors | Preview/commit uses stable IDs and rejects bad rows | Invalid/duplicate fixture test; do not proceed with silent imports |
+| 5–7 | Pure score/risk/explanation + tests | Exact formula/coverage/flags pass boundary tests | Run unit tests; P0 blocker overrides UI work |
+| 7–9 | API contracts and dashboard vertical slice | Seed -> API -> score cards/queue works | API integration test; start deployment preparation |
+| 9–11 | Explorer/profile and filters | Search/filter/profile explanations update from live DB | Manual filter reconciliation; cut fancy charts |
+| 11–12 | First deployment attempt | Hosted build starts from repository and loads seed | Hosted smoke test; use fallback host immediately if failed |
+| 12–14 | Import UI, methodology, error/empty states | User can validate/commit CSV and read formula | Import end-to-end test |
+| 14–16 | P1 segmentation + intervention persistence | Segment reasons and create/update/reload intervention work | Integration/manual test; deployed core target reached by hour 16 |
+| 16–18 | Responsive/accessibility, import history, deployment hardening | Keyboard/contrast/basic mobile and production build checked | Cut import history before any P0 defect |
+| 18–20 | Demo data checks, README/docs, slides/demo rehearsal | Rubric checklist, 3–5 minute story, hosted link verified | Time rehearsal and record gaps |
+| 20–22 | Final six-hour hardening window (begins hour 16) | Regression, test/build, hosted smoke, submission package | Cut P2 first, simplify P1 second; never cut P0 correctness/deployment |
+
+P0: runnable deployed core, integrated data, deterministic scoring/risk, dashboard/explorer, one credible import or documented seeded path, official deliverables. P1: explainability, segmentation, interventions, import history/stronger validation. P2: LLM, elaborate visualizations/animations, auth/roles, live integrations, sophisticated ML. The final six hours are protected beginning at hour 16; no new P2 work then.
+
+## 14. Implementation order for OmniRush
+
+1. Confirm actual repository state, preserve it, run baseline. Checkpoint: record commands/results.
+2. Establish minimal TypeScript client/server skeleton. Checkpoint: health endpoint and blank app build.
+3. Define schema/migrations and idempotent synthetic seed. Checkpoint: database constraints and fixture count query pass.
+4. Implement/test CSV parse, templates, row validation and batch commit. Checkpoint: valid import, invalid row and unknown ID tests.
+5. Implement pure score/risk/explain functions before UI. Checkpoint: all formula/boundary tests pass.
+6. Implement routes/services/repositories against the contracts. Checkpoint: API integration flow seed -> profile -> score.
+7. Build dashboard/explorer with truly connected filters. Checkpoint: UI filter alters rows and metrics together.
+8. Build profile and methodology/explanation. Checkpoint: displayed contribution evidence reconciles to API.
+9. Add segments/cohort analysis. Checkpoint: edge fixtures produce expected overlaps/reasons.
+10. Add intervention CRUD/history and reload persistence. Checkpoint: create/update/reload sequence passes.
+11. Deploy as soon as vertical slice is sound. Checkpoint: hosted health, seed, dashboard, profile.
+12. Add optional insight adapter only with stable core. Checkpoint: no-key fallback works.
+13. Run tests/build/e2e and repair failures before enhancements. Checkpoint: record real output, not assumed success.
+14. Complete docs, demo script, slide outline, and final rubric audit. Checkpoint: rehearsal uses the deployed build.
+
+At every failed checkpoint, diagnose/fix/rerun before the next step. Avoid rewrites and never report an unrun test as passing.
+
+## 15. Test plan and acceptance criteria
+
+Unit: normalization, declared CGPA scales, weights, coverage, bounds, backlogs, missing data, risk thresholds, explanation reconciliation, segment rules and intervention schema/status validation. Integration: CSV -> errors/commit -> persisted source records -> score refresh -> dashboard totals; import conflicts; intervention persistence. E2E when tooling permits: load demo, filter explorer, open profile, inspect explanation, create/edit intervention. Dataset quality: referential integrity, no accidental real PII, all seven domains represented, deliberate gaps and invalid rows. Deployment smoke: health, seeded overview, direct profile route, import template, intervention reload. Check keyboard navigation, visible focus, labels, contrast, 320px layout and chart text fallback.
+
+Given a valid unified CSV, when committed, then every accepted row is tied through student_id and dashboard count/scores refresh. Given a malformed row, when validated, then its row number/field/message is shown and no silent coercion occurs. Given missing components below 60% coverage, when scoring, then score is “Insufficient data,” not zero. Given attendance 74.9, when refreshing, then attendance review appears; at 75 it does not solely for attendance. Given a high-academic/low-placement fixture, when segments load, then it has that segment and threshold reasons. Given a faculty saves an intervention, when reloading, then the updated record/history remains. Given an optional AI outage, when requesting insight, then the UI shows labelled calculated fallback and core screens remain usable.
+
+Final verification checklist: [ ] implemented, [ ] unit/integration-tested, [ ] manually verified, [ ] hosted verified for each P0 matrix item. Do not mark a feature complete merely because a component exists.
+
+## 16. Synthetic demo data and demo story
+
+Seed 48–60 synthetic, internally consistent students across 3 departments/programmes/semesters, clearly stamped `SYNTHETIC DEMO DATA`. Include at least: 6 consistently strong, 6 high academic/low placement, 6 low attendance/weak academic, 4 placement-ready/academic-support, 5 partial-data/insufficient coverage, varied engagement, and several with interventions. Add a separate invalid import fixture containing duplicate ID, unknown ID, invalid percent, missing cgpa_scale and malformed date; never seed invalid rows into the database.
+
+Three-to-five-minute story: (1) state synthetic/heuristic disclosure and load demo or validate a small CSV; (2) show integrated cohort overview and filter the placement-readiness gap segment; (3) open one student, describe data coverage, deterministic drivers and review signals; (4) create/assign a placement preparation intervention, add a follow-up/status change; (5) show methodology and explain that faculty, not automation, decides action. Do not claim the patterns belong to an actual institution.
+
+## 17. Deployment and release plan
+
+[PROPOSED] First try a single Node service on Render/Railway or another team-accessible service compatible with a Dockerfile. Build: `npm ci && npm run build`; start: `npm start`; health: `GET /healthz`; set `PORT`, `NODE_ENV=production`, `DATABASE_PATH` and only optional AI variables in host secrets. Use a persistent disk/database only if the selected tier/team account actually provides it. Commit `.env.example` with placeholder names only, `.gitignore` actual env/db data, run migrations/seed through an explicit release command, and configure CORS only if a separate origin is actually used.
+
+Exact release sequence: production build/test locally; create service from repository; configure non-secret settings/secrets; deploy; inspect build logs; open `/healthz`; load overview; open a seeded profile; verify a filter and a persisted intervention; record URL/time. If signup, build, native binding or storage fails, switch once to the preselected alternative host; if that also fails, serve the tested local app for judges and provide build/run instructions with an honest deployment-blocker note. Never publish real student data or keys. Verify hosted behavior, not just a successful deployment log.
+
+## 18. Architecture and scoring deliverables
+
+Produce during implementation: an architecture diagram (the Mermaid above), data model/schema note, score formula/rationale and limitations, CSV/import-schema documentation, README with setup/run/test/deploy, demo script, concise 5–6 slide outline (problem, data integration, score/guardrails, dashboard/segments, interventions, impact/limits), deployed URL and rubric checklist. These support the official dashboard, score explanation, and short demo/slides deliverables; they are not optional polish.
+
+## 19. Risks, fallbacks, and feature-cut rules
+
+| Risk | Probability / impact | Early warning | Mitigation and fallback |
+|---|---|---|---|
+| Broad unverified agent changes | Medium / High | Large diff, unrun tests | Small checkpoints, inspect diff, run tests; revert only own safe changes, not user work |
+| Framework/dependency mismatch | Medium / High | Install/build errors in hour 1 | Verify versions first; use fewer libraries, plain CSS/table fallback |
+| Import inconsistency | High / High | Header/range/ID surprises | Template + Zod + preview + error rows; keep seeded path |
+| Scoring bug | Medium / High | Contributions do not reconcile | Pure functions/fixtures/boundary tests; freeze algorithm version |
+| DB/persistence failure | Medium / High | Migration/native binding/reload failures | Repository abstraction; JSON fallback; disclose hosting durability |
+| Deployment failure | Medium / High | First attempt not live by hour 12 | Attempt early, alternate host once, local demo fallback |
+| LLM unavailable | High / Low | No key/timeouts | Optional adapter and deterministic aggregate fallback |
+| Scope overload | High / High | P0 incomplete by hour 12 | Freeze P2; simplify P1; retain P0 vertical slice |
+| UI/API integration break | Medium / High | Stale/inconsistent totals | Contract tests/query invalidation; table-first UI |
+| Empty/malformed data | High / Medium | No meaningful result | Explicit empty/error states; templates/demo seed |
+
+Hard rule: when a P0 item blocks progress, stop adding features and fix it. If behind, remove P2 first, then simplify P1; do not trade P0 correctness or early deployment for novelty.
+
+## 20. Final handoff instructions to OmniRush
+
+Treat this blueprint as the implementation source of truth while preserving applicable existing workspace code and conventions. Inspect the actual repository first; it may differ from this empty-repository reconnaissance. Convert the traceability matrix into a tracked checklist. Implement one vertical slice at a time and use only actual available tools. Never claim a command, test, build or deployment succeeded unless it was run and its result checked. Keep a progress checklist and record justified deviations.
+
+Do not overwrite/delete user work without explicit permission. Prefer small, testable edits over giant code dumps. Do not stop at a plan or scaffold: implement, integrate, test, deploy and document the product. When blocked, investigate reasonable fixes and then use the documented fallback. Prioritize mandatory working functionality over optional AI. Protect the final six hours for hardening, hosted verification, presentation and submission. Final reporting must clearly distinguish completed, tested, deployed and unverified features.

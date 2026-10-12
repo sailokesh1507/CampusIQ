@@ -1,0 +1,15 @@
+node_modules/
+dist/
+dist-client/
+dist-server/
+.vite/
+coverage/
+.env
+.env.*
+!.env.example
+data/*.db
+data/*.db-*
+*.log
+playwright-report/
+test-results/
+.DS_Store

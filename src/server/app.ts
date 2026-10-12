@@ -1,0 +1,188 @@
+import cors from 'cors';
+import express, { type Express, type Request, type Response } from 'express';
+import multer from 'multer';
+import { randomUUID } from 'node:crypto';
+import path from 'node:path';
+import { z } from 'zod';
+import { calculateScore } from '../analytics/scoring.js';
+import { getSegments, SEGMENT_DEFINITIONS } from '../analytics/segments.js';
+import { METHODOLOGY } from '../shared/methodology.js';
+import type { DashboardData, Intervention, StudentRecord, StudentSummary } from '../shared/types.js';
+import { Database } from '../db/connection.js';
+import { seedDatabase } from '../db/seed.js';
+import { unifiedTemplate } from '../import/templates.js';
+import { validateUnifiedCsv } from '../import/validators.js';
+import { getIntervention, getRecord, getRecords, getSegmentsForRecord, getSnapshotId, listInterventions, mapIntervention, refreshSnapshots, toSummary, upsertRecord } from './repository.js';
+
+interface AppOptions { databasePath: string; staticPath?: string; }
+interface PendingImport { records: StudentRecord[]; mode: 'atomic' | 'partial'; blockingHeaderErrors: boolean; }
+
+const pendingImports = new Map<string, PendingImport>();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
+const interventionSchema = z.object({
+  studentId: z.string().min(1), category: z.enum(['academic', 'attendance', 'learning', 'placement', 'wellbeing_referral', 'other']), title: z.string().trim().min(1).max(160), rationale: z.string().trim().min(1).max(2000), owner: z.string().trim().min(1).max(120), dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), status: z.enum(['open', 'in_progress', 'completed', 'cancelled']).default('open'), scoreSnapshotId: z.string().nullable().optional(),
+});
+
+const response = (res: Response, data: unknown, status = 200) => res.status(status).json({ data });
+const failure = (res: Response, code: string, message: string, status = 400, fieldErrors?: unknown) => res.status(status).json({ error: { code, message, ...(fieldErrors ? { fieldErrors } : {}) } });
+const queryString = (value: unknown): string => typeof value === 'string' ? value : '';
+const median = (values: number[]): number | null => { if (!values.length) return null; const sorted = [...values].sort((a, b) => a - b); const middle = Math.floor(sorted.length / 2); return Number((sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2).toFixed(1)); };
+
+function matches(record: StudentRecord, summary: StudentSummary, query: Record<string, string>): boolean {
+  const q = query.q?.toLowerCase();
+  if (q && !`${record.studentId} ${record.displayName} ${record.department} ${record.programme}`.toLowerCase().includes(q)) return false;
+  if (query.department && record.department !== query.department) return false;
+  if (query.programme && record.programme !== query.programme) return false;
+  if (query.semester && String(record.semester) !== query.semester) return false;
+  if (query.signal && !summary.signals.includes(query.signal as StudentSummary['signals'][number])) return false;
+  if (query.segment && !summary.segments.includes(query.segment as StudentSummary['segments'][number])) return false;
+  if (query.minScore && (summary.score === null || summary.score < Number(query.minScore))) return false;
+  if (query.maxScore && (summary.score === null || summary.score > Number(query.maxScore))) return false;
+  if (query.coverage === 'insufficient' && summary.coverage >= 60) return false;
+  if (query.coverage === 'assessed' && summary.coverage < 60) return false;
+  return true;
+}
+
+function filteredRows(database: Database, query: Record<string, string>): Array<{ record: StudentRecord; summary: StudentSummary }> {
+  return getRecords(database).map((record) => ({ record, summary: toSummary(record) })).filter(({ record, summary }) => matches(record, summary, query));
+}
+
+function dashboard(database: Database, query: Record<string, string>): DashboardData {
+  const rows = filteredRows(database, query);
+  const summaries = rows.map((row) => row.summary);
+  const scoreValues = summaries.flatMap((item) => item.score === null ? [] : [item.score]);
+  const signals = (key: StudentSummary['signals'][number]) => summaries.filter((item) => item.signals.includes(key)).length;
+  const segmentCounts = SEGMENT_DEFINITIONS.map((definition) => ({ ...definition, count: summaries.filter((item) => item.segments.includes(definition.key)).length }));
+  return {
+    kpis: {
+      totalStudents: summaries.length, assessedStudents: scoreValues.length, coveragePercent: summaries.length ? Number((summaries.reduce((sum, item) => sum + item.coverage, 0) / summaries.length).toFixed(1)) : 0,
+      medianScore: median(scoreValues), needsReview: summaries.filter((item) => item.supportLevel === 'needs_review').length, watch: summaries.filter((item) => item.supportLevel === 'watch').length,
+      academicSignals: signals('academic'), attendanceSignals: signals('attendance'), placementSignals: signals('placement'), learningSignals: signals('learning'),
+    },
+    distribution: [
+      { label: 'Needs review', count: summaries.filter((item) => item.supportLevel === 'needs_review').length, color: '#dc6b55' },
+      { label: 'Watch', count: summaries.filter((item) => item.supportLevel === 'watch').length, color: '#d49b45' },
+      { label: 'No immediate signal', count: summaries.filter((item) => item.supportLevel === 'none').length, color: '#2c9d8f' },
+      { label: 'Insufficient data', count: summaries.filter((item) => item.supportLevel === 'insufficient').length, color: '#8b98a8' },
+    ],
+    segments: segmentCounts.map(({ key, label, count, description }) => ({ key, label, count, description })),
+    reviewQueue: summaries.filter((item) => item.supportLevel === 'needs_review' || item.supportLevel === 'watch').sort((a, b) => (a.score ?? 101) - (b.score ?? 101)).slice(0, 8),
+    filtersApplied: query,
+  };
+}
+
+function parseRowsForCommit(validation: ReturnType<typeof validateUnifiedCsv>): StudentRecord[] {
+  const invalidRows = new Set(validation.errors.filter((error) => error.rowNumber > 1).map((error) => error.rowNumber));
+  return validation.records.filter((_, index) => !invalidRows.has(index + 2));
+}
+
+export function createApp(options: AppOptions): Express {
+  const app = express();
+  const database = new Database(options.databasePath);
+  database.initialize();
+  seedDatabase(database);
+  refreshSnapshots(database);
+
+  app.use(cors());
+  app.use(express.json({ limit: '1mb' }));
+  app.get('/healthz', (_req: Request, res: Response) => response(res, { status: 'ok', service: 'campusiq', database: 'ready' }));
+  app.get('/api/health', (_req: Request, res: Response) => response(res, { status: 'ok' }));
+
+  app.get('/api/dashboard', (req, res) => response(res, dashboard(database, req.query as Record<string, string>)));
+  app.get('/api/students', (req, res) => {
+    const query = req.query as Record<string, string>;
+    const rows = filteredRows(database, query);
+    const sort = query.sort ?? 'score';
+    rows.sort((a, b) => {
+      if (sort === 'name') return a.record.displayName.localeCompare(b.record.displayName);
+      if (sort === 'coverage') return b.summary.coverage - a.summary.coverage;
+      return (a.summary.score ?? -1) - (b.summary.score ?? -1);
+    });
+    const page = Math.max(1, Number(query.page ?? 1));
+    const pageSize = Math.min(100, Math.max(1, Number(query.pageSize ?? 100)));
+    return response(res, { items: rows.slice((page - 1) * pageSize, page * pageSize).map((item) => item.summary), total: rows.length, page, pageSize });
+  });
+  app.get('/api/students/:studentId', (req, res) => {
+    const record = getRecord(database, req.params.studentId);
+    if (!record) return failure(res, 'not_found', 'Student was not found.', 404);
+    const explanation = calculateScore(record);
+    return response(res, { record, explanation, segments: getSegments(record, explanation), interventions: listInterventions(database).filter((item) => item.studentId.toLowerCase() === record.studentId.toLowerCase()) });
+  });
+  app.get('/api/segments', (req, res) => {
+    const rows = filteredRows(database, req.query as Record<string, string>);
+    return response(res, { definitions: SEGMENT_DEFINITIONS, cohorts: SEGMENT_DEFINITIONS.map((definition) => ({ ...definition, count: rows.filter((row) => row.summary.segments.includes(definition.key)).length, students: rows.filter((row) => row.summary.segments.includes(definition.key)).map((row) => row.summary) })) });
+  });
+  app.get('/api/methodology', (_req, res) => response(res, { ...METHODOLOGY, formula: 'Score = sum(component × published weight) / sum(weights for present components)', componentNotes: { academic: '60% normalized CGPA + 40% marks/subject average, with up to 20 points for backlogs.', attendance: 'Overall attendance, or subject mean when available.', learning: '60% LMS + 25% engagement + 15% skills, reweighted across supplied groups.', placement: '40% aptitude + 35% coding + 25% mock interview, reweighted across supplied tests.' }, excludedFromScore: ['Faculty feedback text', 'Student satisfaction'], missingData: 'Blank optional fields remain NULL. A score is withheld below 60% top-level component coverage.' }));
+  app.post('/api/analytics/refresh', (_req, res) => response(res, { recalculatedStudents: refreshSnapshots(database), algorithmVersion: METHODOLOGY.version }));
+
+  app.get('/api/import/templates/unified', (_req, res) => { res.type('text/csv').send(unifiedTemplate()); });
+  app.post('/api/imports/validate', upload.single('file'), (req, res) => {
+    if (!req.file) return failure(res, 'missing_file', 'Attach a CSV file in the file field.', 400);
+    const mode = req.body.mode === 'partial' ? 'partial' : 'atomic';
+    const validation = validateUnifiedCsv(req.file.buffer.toString('utf8'));
+    const batchId = randomUUID();
+    const accepted = parseRowsForCommit(validation);
+    const now = new Date().toISOString();
+    database.db.prepare('INSERT INTO import_batches (id, source_type, filename, mode, status, total_rows, accepted_rows, rejected_rows, initiated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(batchId, 'unified', req.file.originalname, mode, 'validated', validation.totalRows, accepted.length, validation.totalRows - accepted.length, 'demo faculty');
+    const insertError = database.db.prepare('INSERT INTO import_errors (batch_id, row_number, field, code, message, raw_value) VALUES (?, ?, ?, ?, ?, ?)');
+    for (const error of validation.errors) insertError.run(batchId, error.rowNumber, error.field, error.code, error.message, error.rawValue);
+    pendingImports.set(batchId, { records: accepted, mode, blockingHeaderErrors: !validation.headersValid });
+    return response(res, { batchId, status: 'validated', totalRows: validation.totalRows, acceptedRows: accepted.length, rejectedRows: validation.totalRows - accepted.length, errors: validation.errors }, 201);
+  });
+  app.post('/api/imports/:batchId/commit', (req, res) => {
+    const pending = pendingImports.get(req.params.batchId);
+    if (!pending) return failure(res, 'batch_not_found', 'Validation preview expired or batch does not exist.', 404);
+    const batch = database.db.prepare('SELECT * FROM import_batches WHERE id = ?').get(req.params.batchId) as { rejected_rows: number; mode: string } | undefined;
+    if (!batch) return failure(res, 'batch_not_found', 'Import batch does not exist.', 404);
+    if (pending.blockingHeaderErrors) return failure(res, 'blocking_errors', 'The CSV header contract is invalid. Download the unified template and correct the headers before committing.', 422);
+    if (batch.rejected_rows > 0 && pending.mode === 'atomic') return failure(res, 'blocking_errors', 'Atomic import cannot commit while row errors remain. Choose partial mode after reviewing the errors.', 422);
+    const commit = database.db.transaction(() => { for (const record of pending.records) upsertRecord(database, record, req.params.batchId); database.db.prepare('UPDATE import_batches SET status = ?, imported_at = ? WHERE id = ?').run('committed', new Date().toISOString(), req.params.batchId); });
+    commit();
+    pendingImports.delete(req.params.batchId);
+    refreshSnapshots(database);
+    return response(res, { batchId: req.params.batchId, status: 'committed', importedRows: pending.records.length, recalculatedStudents: getRecords(database).length });
+  });
+  app.get('/api/imports', (_req, res) => response(res, database.db.prepare('SELECT * FROM import_batches ORDER BY COALESCE(imported_at, rowid) DESC').all()));
+  app.get('/api/imports/:batchId/errors', (req, res) => response(res, database.db.prepare('SELECT row_number as rowNumber, field, code, message, raw_value as rawValue FROM import_errors WHERE batch_id = ? ORDER BY row_number, id').all(req.params.batchId)));
+
+  app.get('/api/interventions', (_req, res) => response(res, listInterventions(database)));
+  app.post('/api/interventions', (req, res) => {
+    const parsed = interventionSchema.safeParse(req.body);
+    if (!parsed.success) return failure(res, 'validation_error', 'Review the required intervention fields.', 400, parsed.error.flatten().fieldErrors);
+    if (!getRecord(database, parsed.data.studentId)) return failure(res, 'unknown_student', 'The selected student does not exist.', 422, { studentId: ['Unknown student ID'] });
+    const id = randomUUID(); const now = new Date().toISOString();
+    database.db.prepare('INSERT INTO interventions (id, student_id, score_snapshot_id, category, title, rationale, owner, due_date, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(id, parsed.data.studentId, parsed.data.scoreSnapshotId ?? getSnapshotId(database, parsed.data.studentId), parsed.data.category, parsed.data.title, parsed.data.rationale, parsed.data.owner, parsed.data.dueDate, parsed.data.status, now, now);
+    return response(res, getIntervention(database, id), 201);
+  });
+  app.patch('/api/interventions/:id', (req, res) => {
+    const current = getIntervention(database, req.params.id);
+    if (!current) return failure(res, 'not_found', 'Intervention was not found.', 404);
+    const patch = z.object({ title: z.string().trim().min(1).max(160).optional(), rationale: z.string().trim().min(1).max(2000).optional(), owner: z.string().trim().min(1).max(120).optional(), dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), status: z.enum(['open', 'in_progress', 'completed', 'cancelled']).optional(), actor: z.string().trim().min(1).max(120).default('Faculty reviewer') }).safeParse(req.body);
+    if (!patch.success) return failure(res, 'validation_error', 'Invalid intervention update.', 400, patch.error.flatten().fieldErrors);
+    const transitions: Record<Intervention['status'], Intervention['status'][]> = { open: ['in_progress', 'cancelled'], in_progress: ['completed', 'cancelled'], completed: [], cancelled: [] };
+    if (patch.data.status && patch.data.status !== current.status && !transitions[current.status].includes(patch.data.status)) return failure(res, 'invalid_transition', `An intervention in ${current.status} cannot move to ${patch.data.status}.`, 422);
+    const updated = { ...current, ...patch.data }; const now = new Date().toISOString();
+    database.db.prepare('UPDATE interventions SET title = ?, rationale = ?, owner = ?, due_date = ?, status = ?, updated_at = ? WHERE id = ?').run(updated.title, updated.rationale, updated.owner, updated.dueDate, updated.status, now, current.id);
+    if (patch.data.status && patch.data.status !== current.status) {
+      database.db.prepare('INSERT INTO intervention_notes (id, intervention_id, body, author, created_at) VALUES (?, ?, ?, ?, ?)').run(randomUUID(), current.id, `Status changed from ${current.status} to ${patch.data.status}.`, patch.data.actor, now);
+    }
+    return response(res, getIntervention(database, current.id));
+  });
+  app.post('/api/interventions/:id/notes', (req, res) => {
+    const current = getIntervention(database, req.params.id);
+    if (!current) return failure(res, 'not_found', 'Intervention was not found.', 404);
+    const parsed = z.object({ body: z.string().trim().min(1).max(2000), author: z.string().trim().min(1).max(120).default('Faculty reviewer') }).safeParse(req.body);
+    if (!parsed.success) return failure(res, 'validation_error', 'A note body is required and must be under 2,000 characters.', 400, parsed.error.flatten().fieldErrors);
+    database.db.prepare('INSERT INTO intervention_notes (id, intervention_id, body, author, created_at) VALUES (?, ?, ?, ?, ?)').run(randomUUID(), current.id, parsed.data.body, parsed.data.author, new Date().toISOString());
+    return response(res, getIntervention(database, current.id));
+  });
+
+  if (options.staticPath) {
+    app.use(express.static(options.staticPath));
+    app.use((req, res, next) => {
+      if (req.method === 'GET' && !req.path.startsWith('/api')) return res.sendFile(path.join(options.staticPath!, 'index.html'));
+      next();
+    });
+  }
+  return app;
+}
