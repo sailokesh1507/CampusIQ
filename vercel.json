@@ -1,14 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
+  "framework": null,
   "installCommand": "npm ci",
   "buildCommand": "npm run build",
   "outputDirectory": "public",
-  "functions": {
-    "src/index.ts": {
-      "runtime": "nodejs24.x",
-      "maxDuration": 30,
-      "includeFiles": ["node_modules/better-sqlite3/build/Release/*.node"]
-    }
-  }
+  "rewrites": [
+    { "source": "/healthz", "destination": "/api/index?__route=/healthz" },
+    { "source": "/api/:path*", "destination": "/api/index?__route=/api/:path*" }
+  ]
 }
