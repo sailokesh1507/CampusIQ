@@ -8,5 +8,5 @@
 - [x] CSV validation reports row-level errors and supports atomic/partial commit.
 - [x] Intervention status/note persistence is covered by API integration tests.
 - [x] `/healthz`, `Dockerfile`, `render.yaml`, `.env.example` and deployment limitations are documented.
-- [ ] Add the actual hosted URL after a chosen host is provisioned and smoke-tested.
+- [x] Hosted URL provisioned and smoke-tested: https://campusiq-eight.vercel.app
 - [ ] Complete final hosted smoke test, demo rehearsal and submission form.

@@ -97,6 +97,12 @@ The unified CSV requires `student_id`, `observed_at` and at least one measurable
 
 The recommended deployment shape is one Node service because the Express server serves the built Vite client. The repository also includes `vercel.json` and `src/index.ts` for a Vercel deployment. See [`docs/deployment.md`](docs/deployment.md), `Dockerfile`, and `render.yaml`. Configure:
 
+### Live demo
+
+**https://campusiq-eight.vercel.app**
+
+The live production deployment is verified at `/`, `/healthz`, `/api/dashboard`, `/api/students/SYN-007`, `/api/methodology`, and `/api/import/templates/unified`.
+
 - `NODE_ENV=production`
 - `PORT` supplied by the host
 - `DATABASE_PATH` on a persistent disk if intervention writes must survive restarts
