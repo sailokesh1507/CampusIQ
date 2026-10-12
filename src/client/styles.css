@@ -149,3 +149,36 @@ h1, h2, h3, h4, strong { font-family: 'Space Grotesk', 'DM Sans', sans-serif; }
 .profile-drawer { display: flex; flex-direction: column; }
 .profile-drawer .drawer-header, .profile-drawer .drawer-footer { flex: 0 0 auto; }
 .profile-drawer .drawer-body { min-height: 0; flex: 1 1 auto; padding-bottom: 24px; }
+
+/* Readability pass: keep the dense dashboard compact without making supporting copy tiny. */
+.brand small { font-size: 9px; }
+.workspace-label strong { font-size: 12px; }
+.workspace-label small, .sidebar-foot small { font-size: 11px; }
+.nav-caption { font-size: 10px; }
+.nav-item { font-size: 13px; }
+.sidebar-note strong { font-size: 13px; }
+.sidebar-note p, .sidebar-note .text-button { font-size: 11px; }
+.sidebar-foot strong { font-size: 12px; }
+.topbar-breadcrumb, .today { font-size: 12px; }
+.demo-banner { font-size: 11px; }
+.page-header p { font-size: 14px; }
+.metric-top { font-size: 11px; }
+.metric-note, .panel-heading p, .panel-footnote { font-size: 11px; }
+.signal-info > span { font-size: 12px; }
+.panel-footnote { line-height: 1.4; }
+.distribution-legend > div { font-size: 11px; }
+.student-identity strong { font-size: 12px; }
+.student-identity small { font-size: 10px; }
+.score small { font-size: 9px; }
+.badge { font-size: 9px; }
+.section-intro p { font-size: 13px; }
+.filter-details label, .import-options label, form label { font-size: 11px; }
+.sort-control select, .filter-details select, .import-options select, form select, form input, form textarea { font-size: 12px; }
+.student-table th { font-size: 10px; }
+.student-table td { font-size: 12px; }
+.drawer-section > h3, .drawer-section-heading h3 { font-size: 14px; }
+.profile-identity p, .profile-cohort { font-size: 11px; }
+.summary-copy { font-size: 12px; }
+.component-top { font-size: 12px; }
+.component-meta, .component-details, .missing-box ul { font-size: 11px; }
+.component-details summary, .missing-box summary { font-size: 11px; }
