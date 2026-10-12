@@ -11,4 +11,5 @@
 - [x] Hosted URL provisioned and smoke-tested: https://campusiq-eight.vercel.app
 - [x] Authentication/session/catalog foundation is covered by API integration tests while demo mode remains safe for judges.
 - [x] Complete final hosted smoke test and live Postgres write-path rehearsal.
+- [x] Fictional presentation CSV validates cleanly and is loaded into the hosted demo without real student PII.
 - [ ] Complete demo rehearsal and submission form.

@@ -3,11 +3,22 @@ import type { StudentRecord } from '../shared/types.js';
 const observedAt = '2026-01-15T00:00:00.000Z';
 const departments = ['Computer Science', 'Information Systems', 'Electronics & Communication'];
 const programmes = ['B.Tech Computer Science', 'BBA Business Analytics', 'B.Tech Electronics'];
+const displayNames = [
+  'Aarav Menon', 'Meera Nair', 'Vihaan Iyer', 'Ananya Rao', 'Kabir Shah', 'Ishita Kulkarni',
+  'Rohan Deshpande', 'Nandini Pillai', 'Arjun Bhat', 'Kavya Krishnan', 'Aditya Sethi', 'Diya Mukherjee',
+  'Neel Joshi', 'Aisha Thomas', 'Siddharth Kapoor', 'Tanvi Hegde', 'Dhruv Malhotra', 'Sanya Reddy',
+  'Karthik Srinivas', 'Isha Varma', 'Reyansh Bose', 'Prisha Chatterjee', 'Advaith Shetty', 'Riya Banerjee',
+  'Harsh Venkatesh', 'Myra Fernandes', 'Yash Patil', 'Tara Narayanan', 'Manav Gupta', 'Sneha Das',
+  'Anirudh Nambiar', 'Pooja Bansal', 'Vedant Jain', 'Anika Dutta', 'Rohit Yadav', 'Simran Kaur',
+  'Omkar Salunkhe', 'Aditi Roy', 'Varun Mehta', 'Mahi Shah', 'Arnav Sengupta', 'Nisha Menon',
+  'Devansh Kumar', 'Ritu Mallick', 'Atharv Kulkarni', 'Sanjana Rao', 'Pranav Suresh', 'Alina George',
+  'Lakshya Agarwal', 'Shruti Iyer', 'Samarth Naik', 'Neha Kapoor', 'Madhav Rangan', 'Aanya Bedi',
+];
 
 function record(index: number, overrides: Partial<StudentRecord> = {}): StudentRecord {
   return {
     studentId: `SYN-${String(index).padStart(3, '0')}`,
-    displayName: `Synthetic Student ${String(index).padStart(2, '0')}`,
+    displayName: displayNames[index - 1] ?? `Campus Learner ${String(index).padStart(2, '0')}`,
     email: null,
     department: departments[(index - 1) % departments.length],
     programme: programmes[(index - 1) % programmes.length],

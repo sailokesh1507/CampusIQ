@@ -27,6 +27,7 @@
     "verify": "npm run typecheck && npm test && npm run build",
     "smoke:live": "node scripts/smoke.mjs https://campusiq-eight.vercel.app",
     "smoke:live:writes": "node scripts/smoke-live-writes.mjs",
+    "demo:load:live": "node scripts/load-fictional-demo.mjs",
     "deploy:vercel": "npx --yes vercel@latest deploy --yes --prod",
     "preview": "vite preview",
     "check": "npm run typecheck"

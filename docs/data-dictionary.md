@@ -14,7 +14,7 @@ Required headers are `student_id` and `observed_at`. At least one of the followi
 | Skills | `technical_skill_score`, `soft_skill_score` | 0–100 |
 | Feedback | `student_satisfaction`, `faculty_feedback` | Satisfaction 1–5; text is context only |
 
-`display_name`, `department`, `programme`, and `semester` are cohort context. Semester is 1–12. Names are synthetic demo labels by default. Student identity is always joined by `student_id`; names are never keys.
+`display_name`, `department`, `programme`, and `semester` are cohort context. Semester is 1–12. The repository's demo CSV uses plausible but fictional names; it contains no real student PII. Student identity is always joined by `student_id`; names are never keys.
 
 ## Validation behavior
 
