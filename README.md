@@ -160,6 +160,7 @@ The live production deployment is verified at `/`, `/healthz`, `/api/dashboard`,
 - `NODE_ENV=production`
 - `PORT` supplied by the host
 - `DATABASE_PATH` on a persistent disk if intervention writes must survive restarts
+- `DATABASE_URL` for the managed Postgres migration path
 - `APP_BASE_URL` for documentation/host metadata
 
 No AI provider or secret is required. The optional AI variables are intentionally absent from the frontend and are not needed by the product path. If the selected host does not guarantee persistent disk storage, present this as a seeded synthetic demo and do not claim cross-redeploy persistence.

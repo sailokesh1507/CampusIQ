@@ -35,6 +35,14 @@ Set `NODE_ENV=production`, the host-provided `PORT`, `DATABASE_PATH`, and `APP_B
 
 For the current synthetic demo, leave `DEMO_MODE=true` and `AUTH_REQUIRED=false`. For an institution deployment, do not point real data at Vercel's ephemeral `/tmp/campusiq.db`; provision managed Postgres, create the first admin user through a controlled process, set `DEMO_MODE=false`, and set `AUTH_REQUIRED=true`. The repository now includes the auth/session/catalog foundation, but durable Postgres provisioning and enterprise identity integration remain the next backend milestone.
 
+The production schema is prepared in `src/db/postgres-schema.sql`. Apply it with:
+
+```text
+DATABASE_URL=postgres-connection-string npm run db:migrate:postgres
+```
+
+The current application remains on the SQLite demo adapter until the Postgres repository adapter is enabled and verified. This prevents an unconfigured production database from breaking the public synthetic demo.
+
 ## Render-style setup
 
 `render.yaml` describes a web service with `npm ci && npm run build` and `npm start`. If a persistent disk is available on the selected plan, mount it and set `DATABASE_PATH=/var/data/campusiq.db`. If not, the application remains usable as a seeded synthetic demo, but SQLite writes may be lost on restart/redeploy. Verify this behavior with a real intervention after deployment before claiming persistence.
