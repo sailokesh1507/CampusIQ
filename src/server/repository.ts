@@ -66,6 +66,9 @@ export function refreshSnapshots(db: Database): number {
     }
   });
   refresh();
+  const latestSnapshots = db.db.prepare('SELECT student_id, id FROM score_snapshots WHERE calculated_at = ?').all(now) as Array<{ student_id: string; id: string }>;
+  const updateIntervention = db.db.prepare('UPDATE interventions SET score_snapshot_id = ? WHERE student_id = ? AND score_snapshot_id IS NULL');
+  for (const snapshot of latestSnapshots) updateIntervention.run(snapshot.id, snapshot.student_id);
   return records.length;
 }
 

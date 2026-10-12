@@ -2,14 +2,16 @@
 
 ## Vercel deployment
 
-Vercel can detect the exported Express application in `src/index.ts` and the Vite build in `public/`. Deploy from the repository with:
+Vercel detects the exported Express application in `src/index.ts`. The configured build runs the Vite client into `public/`, which Vercel serves as CDN assets; Express serves the API as one serverless function. Deploy from the repository with:
 
 ```text
 npx vercel@latest login
 npx vercel@latest --prod
 ```
 
-The Vercel function uses `/tmp/campusiq.db` when `DATABASE_PATH` is not configured. This makes the synthetic demo and intervention workflow usable, but writes are not guaranteed across cold starts or redeploys. Configure a managed database or use the Render/persistent-disk arrangement before claiming durable production persistence.
+The Vercel function uses `/tmp/campusiq.db` when `DATABASE_PATH` is not configured. This makes the synthetic demo and intervention workflow usable, but writes are not guaranteed across cold starts or redeploys. Configure a managed database or use the Render/persistent-disk arrangement before claiming durable production persistence. Import previews are staged in SQLite rather than process memory, so validation and commit do not depend on a single warm function instance; durable cross-instance behavior still requires shared storage.
+
+The native `better-sqlite3` binary is explicitly included in the function bundle by `vercel.json`. If a Vercel build reports a native-module compatibility error, use the Render/Docker path documented below, or move the database to a managed service compatible with the repository interface.
 
 After deployment, verify the returned URL at `/healthz`, `/`, `/api/dashboard`, `/api/students/SYN-007`, and the intervention workflow.
 

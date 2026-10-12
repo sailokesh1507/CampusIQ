@@ -79,8 +79,14 @@ export class Database {
         field TEXT NOT NULL, code TEXT NOT NULL, message TEXT NOT NULL, raw_value TEXT NOT NULL,
         FOREIGN KEY(batch_id) REFERENCES import_batches(id) ON DELETE CASCADE
       );
+      CREATE TABLE IF NOT EXISTS import_staged_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, batch_id TEXT NOT NULL, row_number INTEGER NOT NULL,
+        record_json TEXT NOT NULL,
+        FOREIGN KEY(batch_id) REFERENCES import_batches(id) ON DELETE CASCADE
+      );
       CREATE INDEX IF NOT EXISTS idx_students_department ON students(department);
       CREATE INDEX IF NOT EXISTS idx_interventions_status_due ON interventions(status, due_date);
+      CREATE INDEX IF NOT EXISTS idx_import_staged_batch ON import_staged_records(batch_id, row_number);
     `);
   }
 

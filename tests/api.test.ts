@@ -37,6 +37,29 @@ describe('CampusIQ API integration', () => {
     expect(students.data.total).toBe(1);
   });
 
+  it('keeps only valid rows staged for a partial import and rejects a second commit', async () => {
+    const base = await runningApp();
+    const form = new FormData();
+    form.append('mode', 'partial');
+    form.append('file', new Blob([
+      'student_id,display_name,observed_at,marks_percent,attendance_percent\n',
+      'IMPORT-VALID,Imported Valid,2026-01-15T00:00:00.000Z,71,82\n',
+      'IMPORT-INVALID,Imported Invalid,2026-01-15T00:00:00.000Z,120,82\n',
+    ], { type: 'text/csv' }), 'partial-import.csv');
+    const validation = await (await fetch(`${base}/api/imports/validate`, { method: 'POST', body: form })).json();
+    expect(validation.data.acceptedRows).toBe(1);
+    expect(validation.data.rejectedRows).toBe(1);
+
+    const committed = await (await fetch(`${base}/api/imports/${validation.data.batchId}/commit`, { method: 'POST' })).json();
+    expect(committed.data.importedRows).toBe(1);
+    expect((await (await fetch(`${base}/api/students?q=IMPORT-VALID`)).json()).data.total).toBe(1);
+    expect((await (await fetch(`${base}/api/students?q=IMPORT-INVALID`)).json()).data.total).toBe(0);
+
+    const secondCommit = await (await fetch(`${base}/api/imports/${validation.data.batchId}/commit`, { method: 'POST' })).json();
+    expect(secondCommit.error.code).toBe('batch_not_committable');
+    expect(secondCommit.error.requestId).toBeTruthy();
+  });
+
   it('persists intervention changes and history notes through reloadable API reads', async () => {
     const base = await runningApp();
     const created = await (await fetch(`${base}/api/interventions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ studentId: 'SYN-007', category: 'placement', title: 'Synthetic interview plan', rationale: 'Placement evidence is below the review threshold.', owner: 'Career Services', dueDate: '2026-02-20' }) })).json();
