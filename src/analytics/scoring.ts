@@ -30,34 +30,40 @@ function academicComponent(record: StudentRecord): ComponentResult {
   } else {
     inputsAbsent.push(record.academic.cgpa !== null ? 'declared cgpa scale' : 'CGPA');
   }
+  const subjectMarks = mean(record.subjectMetrics.flatMap((subject) => present(subject.marksPercent) ? [clamp(subject.marksPercent)] : []));
+  const marksValue = present(record.academic.marksPercent) ? clamp(record.academic.marksPercent) : subjectMarks;
   if (present(record.academic.marksPercent)) {
     inputsUsed.push('marks percent');
+  } else if (subjectMarks !== null) {
+    inputsUsed.push('subject performance average');
+    details.push(`Subject performance average is ${subjectMarks.toFixed(1)} / 100 across ${record.subjectMetrics.filter((subject) => present(subject.marksPercent)).length} supplied subject${record.subjectMetrics.filter((subject) => present(subject.marksPercent)).length === 1 ? '' : 's'}.`);
   } else {
-    inputsAbsent.push('marks percent');
+    inputsAbsent.push('marks percent or subject performance');
   }
   if (present(record.academic.backlogs)) inputsUsed.push('backlogs');
   else inputsAbsent.push('backlogs');
   const base = weightedAvailable([
     { value: normalizedCgpa, weight: 60 },
-    { value: present(record.academic.marksPercent) ? clamp(record.academic.marksPercent) : null, weight: 40 },
+    { value: marksValue, weight: 40 },
   ]);
   if (base === null) {
     return { key: 'academic', label: 'Academic performance', value: null, weight: COMPONENT_WEIGHTS.academic, contribution: null, coverage: 0, inputsUsed, inputsAbsent, details: ['No valid CGPA/scale or marks measurement was supplied.'] };
   }
   const adjustment = present(record.academic.backlogs) ? Math.min(20, 5 * record.academic.backlogs) : 0;
   if (adjustment > 0) details.push(`${record.academic.backlogs} backlog${record.academic.backlogs === 1 ? '' : 's'} apply a ${adjustment.toFixed(1)} point adjustment.`);
-  const baseCoverage = (normalizedCgpa !== null ? 60 : 0) + (present(record.academic.marksPercent) ? 40 : 0);
+  const baseCoverage = (normalizedCgpa !== null ? 60 : 0) + (marksValue !== null ? 40 : 0);
   return { key: 'academic', label: 'Academic performance', value: clamp(base - adjustment), weight: COMPONENT_WEIGHTS.academic, contribution: null, coverage: baseCoverage, inputsUsed, inputsAbsent, details };
 }
 
 function attendanceComponent(record: StudentRecord): ComponentResult {
-  const value = present(record.attendance.overallPercent) ? clamp(record.attendance.overallPercent) : null;
+  const subjectAttendance = mean(record.subjectMetrics.flatMap((subject) => present(subject.attendancePercent) ? [clamp(subject.attendancePercent)] : []));
+  const value = present(record.attendance.overallPercent) ? clamp(record.attendance.overallPercent) : subjectAttendance;
   return {
     key: 'attendance', label: 'Attendance', value, weight: COMPONENT_WEIGHTS.attendance, contribution: null,
     coverage: value === null ? 0 : 100,
-    inputsUsed: value === null ? [] : ['overall attendance percent'],
-    inputsAbsent: value === null ? ['overall attendance percent'] : [],
-    details: value === null ? ['No attendance measurement was supplied.'] : [`Overall attendance is ${value.toFixed(1)}%.`],
+    inputsUsed: value === null ? [] : [present(record.attendance.overallPercent) ? 'overall attendance percent' : 'subject-wise attendance average'],
+    inputsAbsent: value === null ? ['overall or subject-wise attendance percent'] : [],
+    details: value === null ? ['No attendance measurement was supplied.'] : [present(record.attendance.overallPercent) ? `Overall attendance is ${value.toFixed(1)}%.` : `Subject-wise attendance average is ${value.toFixed(1)}% across ${record.subjectMetrics.filter((subject) => present(subject.attendancePercent)).length} supplied subject${record.subjectMetrics.filter((subject) => present(subject.attendancePercent)).length === 1 ? '' : 's'}.`],
   };
 }
 

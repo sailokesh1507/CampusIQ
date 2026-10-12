@@ -15,9 +15,6 @@ import { validateUnifiedCsv } from '../import/validators.js';
 import { getIntervention, getRecord, getRecords, getSegmentsForRecord, getSnapshotId, listInterventions, mapIntervention, refreshSnapshots, toSummary, upsertRecord } from './repository.js';
 
 interface AppOptions { databasePath: string; staticPath?: string; }
-interface PendingImport { records: StudentRecord[]; mode: 'atomic' | 'partial'; blockingHeaderErrors: boolean; }
-
-const pendingImports = new Map<string, PendingImport>();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
 const interventionSchema = z.object({
   studentId: z.string().min(1), category: z.enum(['academic', 'attendance', 'learning', 'placement', 'wellbeing_referral', 'other']), title: z.string().trim().min(1).max(160), rationale: z.string().trim().min(1).max(2000), owner: z.string().trim().min(1).max(120), dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), status: z.enum(['open', 'in_progress', 'completed', 'cancelled']).default('open'), scoreSnapshotId: z.string().nullable().optional(),
@@ -123,24 +120,24 @@ export function createApp(options: AppOptions): Express {
     const batchId = randomUUID();
     const accepted = parseRowsForCommit(validation);
     const now = new Date().toISOString();
-    database.db.prepare('INSERT INTO import_batches (id, source_type, filename, mode, status, total_rows, accepted_rows, rejected_rows, initiated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(batchId, 'unified', req.file.originalname, mode, 'validated', validation.totalRows, accepted.length, validation.totalRows - accepted.length, 'demo faculty');
+    database.db.prepare('INSERT INTO import_batches (id, source_type, filename, mode, status, total_rows, accepted_rows, rejected_rows, initiated_by, payload_json, blocking_header_errors) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(batchId, 'unified', req.file.originalname, mode, 'validated', validation.totalRows, accepted.length, validation.totalRows - accepted.length, 'demo faculty', JSON.stringify(accepted), validation.headersValid ? 0 : 1);
     const insertError = database.db.prepare('INSERT INTO import_errors (batch_id, row_number, field, code, message, raw_value) VALUES (?, ?, ?, ?, ?, ?)');
     for (const error of validation.errors) insertError.run(batchId, error.rowNumber, error.field, error.code, error.message, error.rawValue);
-    pendingImports.set(batchId, { records: accepted, mode, blockingHeaderErrors: !validation.headersValid });
     return response(res, { batchId, status: 'validated', totalRows: validation.totalRows, acceptedRows: accepted.length, rejectedRows: validation.totalRows - accepted.length, errors: validation.errors }, 201);
   });
   app.post('/api/imports/:batchId/commit', (req, res) => {
-    const pending = pendingImports.get(req.params.batchId);
-    if (!pending) return failure(res, 'batch_not_found', 'Validation preview expired or batch does not exist.', 404);
-    const batch = database.db.prepare('SELECT * FROM import_batches WHERE id = ?').get(req.params.batchId) as { rejected_rows: number; mode: string } | undefined;
+    const batch = database.db.prepare('SELECT * FROM import_batches WHERE id = ?').get(req.params.batchId) as { rejected_rows: number; mode: 'atomic' | 'partial'; payload_json: string | null; blocking_header_errors: number; status: string } | undefined;
     if (!batch) return failure(res, 'batch_not_found', 'Import batch does not exist.', 404);
-    if (pending.blockingHeaderErrors) return failure(res, 'blocking_errors', 'The CSV header contract is invalid. Download the unified template and correct the headers before committing.', 422);
-    if (batch.rejected_rows > 0 && pending.mode === 'atomic') return failure(res, 'blocking_errors', 'Atomic import cannot commit while row errors remain. Choose partial mode after reviewing the errors.', 422);
-    const commit = database.db.transaction(() => { for (const record of pending.records) upsertRecord(database, record, req.params.batchId); database.db.prepare('UPDATE import_batches SET status = ?, imported_at = ? WHERE id = ?').run('committed', new Date().toISOString(), req.params.batchId); });
+    if (batch.status === 'committed') return failure(res, 'already_committed', 'This import batch has already been committed.', 409);
+    if (batch.blocking_header_errors) return failure(res, 'blocking_errors', 'The CSV header contract is invalid. Download the unified template and correct the headers before committing.', 422);
+    if (batch.rejected_rows > 0 && batch.mode === 'atomic') return failure(res, 'blocking_errors', 'Atomic import cannot commit while row errors remain. Choose partial mode after reviewing the errors.', 422);
+    let records: StudentRecord[];
+    try { records = JSON.parse(batch.payload_json ?? '[]') as StudentRecord[]; } catch { return failure(res, 'invalid_batch_payload', 'Validated import payload could not be restored. Validate the CSV again.', 409); }
+    if (!records.length) return failure(res, 'empty_import', 'No valid CSV rows are available to commit.', 422);
+    const commit = database.db.transaction(() => { for (const record of records) upsertRecord(database, record, req.params.batchId); database.db.prepare('UPDATE import_batches SET status = ?, imported_at = ? WHERE id = ?').run('committed', new Date().toISOString(), req.params.batchId); });
     commit();
-    pendingImports.delete(req.params.batchId);
     refreshSnapshots(database);
-    return response(res, { batchId: req.params.batchId, status: 'committed', importedRows: pending.records.length, recalculatedStudents: getRecords(database).length });
+    return response(res, { batchId: req.params.batchId, status: 'committed', importedRows: records.length, recalculatedStudents: getRecords(database).length });
   });
   app.get('/api/imports', (_req, res) => response(res, database.db.prepare('SELECT * FROM import_batches ORDER BY COALESCE(imported_at, rowid) DESC').all()));
   app.get('/api/imports/:batchId/errors', (req, res) => response(res, database.db.prepare('SELECT row_number as rowNumber, field, code, message, raw_value as rawValue FROM import_errors WHERE batch_id = ? ORDER BY row_number, id').all(req.params.batchId)));

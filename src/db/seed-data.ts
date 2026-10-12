@@ -16,6 +16,7 @@ function record(index: number, overrides: Partial<StudentRecord> = {}): StudentR
     observedAt,
     academic: { cgpa: 7.5, cgpaScale: 10, marksPercent: 74, backlogs: 0 },
     attendance: { overallPercent: 82 },
+    subjectMetrics: [{ subjectCode: 'CS101', marksPercent: 76, attendancePercent: 84 }, { subjectCode: 'MATH101', marksPercent: 72, attendancePercent: 80 }],
     lms: { loginCount: 16, assignmentCompletionPercent: 78 },
     engagement: { eventsCount: 3, clubsCount: 1, hackathonsCount: 1, certificationsCount: 1 },
     placement: { aptitudeScore: 72, codingScore: 68, mockInterviewScore: 70 },

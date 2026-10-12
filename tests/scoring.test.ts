@@ -5,7 +5,7 @@ import type { StudentRecord } from '../src/shared/types.js';
 function fixture(overrides: Partial<StudentRecord> = {}): StudentRecord {
   return {
     studentId: 'TEST-001', displayName: 'Synthetic Test Student', email: null, department: 'Test', programme: 'Test Programme', semester: 4, active: true, observedAt: '2026-01-15T00:00:00.000Z',
-    academic: { cgpa: 10, cgpaScale: 10, marksPercent: 100, backlogs: 0 }, attendance: { overallPercent: 100 },
+    academic: { cgpa: 10, cgpaScale: 10, marksPercent: 100, backlogs: 0 }, attendance: { overallPercent: 100 }, subjectMetrics: [],
     lms: { loginCount: 20, assignmentCompletionPercent: 100 }, engagement: { eventsCount: 6, clubsCount: 0, hackathonsCount: 0, certificationsCount: 3 },
     placement: { aptitudeScore: 100, codingScore: 100, mockInterviewScore: 100 }, skills: { technicalScore: 100, softSkillScore: 100 }, feedback: { studentSatisfaction: 5, facultyFeedback: 'Synthetic test context' }, ...overrides,
   };
@@ -48,6 +48,19 @@ describe('heuristic-v1 scoring', () => {
     expect(boundary.signals.some((signal) => signal.key === 'attendance')).toBe(false);
     const placement = calculateScore(fixture({ placement: { aptitudeScore: 54.9, codingScore: null, mockInterviewScore: null } }));
     expect(placement.signals.some((signal) => signal.key === 'placement')).toBe(true);
+  });
+
+  it('uses subject evidence when overall marks and attendance are unavailable', () => {
+    const result = calculateScore(fixture({
+      academic: { cgpa: null, cgpaScale: null, marksPercent: null, backlogs: 0 },
+      attendance: { overallPercent: null },
+      subjectMetrics: [
+        { subjectCode: 'CS101', marksPercent: 80, attendancePercent: 90 },
+        { subjectCode: 'MATH101', marksPercent: 60, attendancePercent: 70 },
+      ],
+    }));
+    expect(result.components.find((component) => component.key === 'academic')?.value).toBe(70);
+    expect(result.components.find((component) => component.key === 'attendance')?.value).toBe(80);
   });
 
   it('is repeatable for identical input', () => {

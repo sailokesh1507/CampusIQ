@@ -15,7 +15,7 @@ The score uses only components with valid evidence and reweights their published
 
 ## Component calculations
 
-- **Academic:** normalized CGPA (`100 × cgpa / declared scale`) at 60% and marks/subject average at 40%, reweighted when one is absent. Subtract `min(20, 5 × backlogs)` once, then clamp to 0–100. The importer never assumes a 10-point scale.
+- **Academic:** normalized CGPA (`100 × cgpa / declared scale`) at 60% and overall marks or the supplied subject-performance average at 40%, reweighted when one is absent. Subtract `min(20, 5 × backlogs)` once, then clamp to 0–100. The importer never assumes a 10-point scale.
 - **Attendance:** overall percent, otherwise a subject mean when subject records are available.
 - **Learning & engagement:** LMS is 50% capped login activity (`login_count / 20`) and 50% assignment completion; engagement is 40% capped events/clubs/hackathons and 60% capped certifications (`certifications / 3`); skills is the mean technical and soft skill assessment. Groups are combined as 60% LMS, 25% engagement and 15% skills, reweighted across groups.
 - **Placement readiness:** aptitude 40%, coding 35%, mock interview 25%, reweighted over supplied tests.

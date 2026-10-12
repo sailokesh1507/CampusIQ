@@ -9,6 +9,15 @@ describe('unified CSV validation', () => {
     expect(result.records[0].attendance.overallPercent).toBeNull();
   });
 
+  it('parses subject performance and subject-wise attendance into stable subject evidence', () => {
+    const result = validateUnifiedCsv('student_id,observed_at,subject_performance,subject_attendance\nSYN-103,2026-01-15T00:00:00.000Z,"CS101:81;MATH101:73","CS101:90;MATH101:76"\n');
+    expect(result.errors).toHaveLength(0);
+    expect(result.records[0].subjectMetrics).toEqual([
+      { subjectCode: 'CS101', marksPercent: 81, attendancePercent: 90 },
+      { subjectCode: 'MATH101', marksPercent: 73, attendancePercent: 76 },
+    ]);
+  });
+
   it('reports missing scale, invalid ranges, malformed dates and duplicate observations', () => {
     const csv = 'student_id,observed_at,cgpa,marks_percent,attendance_percent\nSYN-101,2026-01-15T00:00:00.000Z,8,,120\nSYN-101,2026-01-15T00:00:00.000Z,,45,80\nSYN-102,not-a-date,,45,80\n';
     const result = validateUnifiedCsv(csv);
