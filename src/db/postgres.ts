@@ -13,19 +13,47 @@ const departmentCatalog = [
 
 export class PostgresDatabase {
   readonly pool: pg.Pool;
-  readonly ready: Promise<void>;
+  private initialization: Promise<void> | null = null;
+  private initialized = false;
 
   constructor(connectionString: string) {
     this.pool = new pg.Pool({
       connectionString,
       max: Number(process.env.DATABASE_POOL_MAX ?? 5),
       idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 10_000,
+      connectionTimeoutMillis: Number(process.env.DATABASE_CONNECTION_TIMEOUT_MS ?? 4_000),
       ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false },
     });
-    this.ready = this.pool.query('SELECT 1').then(async () => {
-      if (process.env.POSTGRES_SEED_DEMO === 'true') await seedPostgresDemo(this);
-    });
+  }
+
+  get ready(): Promise<void> { return this.ensureReady(); }
+
+  async ensureReady(): Promise<void> {
+    if (this.initialized) return;
+    if (!this.initialization) this.initialization = this.initialize();
+    try {
+      await this.initialization;
+      this.initialized = true;
+    } catch (error) {
+      this.initialization = null;
+      throw error;
+    }
+  }
+
+  private async initialize(): Promise<void> {
+    const attempts = Math.max(1, Number(process.env.DATABASE_CONNECTION_ATTEMPTS ?? 2));
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        await this.pool.query('SELECT 1');
+        if (process.env.POSTGRES_SEED_DEMO === 'true') await seedPostgresDemo(this);
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < attempts) await new Promise((resolve) => setTimeout(resolve, 200 * attempt));
+      }
+    }
+    throw lastError;
   }
 
   async transaction<T>(callback: (client: pg.PoolClient) => Promise<T>): Promise<T> {

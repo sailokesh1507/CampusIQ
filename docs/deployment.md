@@ -13,7 +13,7 @@ npx vercel@latest --prod
 
 Once the project is linked with `npx vercel@latest link --yes --project campusiq`, the repository shortcut is `npm run deploy:vercel`. After deployment, `npm run smoke:live` checks the health endpoint, dashboard, seeded profile, methodology endpoint, and CSV template.
 
-The Vercel function uses `/tmp/campusiq.db` when `DATABASE_DRIVER` is not set or is `sqlite`. This keeps the public synthetic demo usable, but writes are not guaranteed across cold starts or redeploys. For durable operation, set `DATABASE_DRIVER=postgres`, `DATABASE_URL`, `DATABASE_SSL=true`, `DEMO_MODE=false`, and `AUTH_REQUIRED=true` after provisioning the first institution administrator. The Postgres import, intervention, catalog, auth and audit paths are implemented behind the same route surface.
+The Vercel function uses `/tmp/campusiq.db` when `DATABASE_DRIVER` is not set or is `sqlite`. This keeps the public synthetic demo usable, but writes are not guaranteed across cold starts or redeploys. For durable operation, set `DATABASE_DRIVER=postgres`, `DATABASE_URL`, `DATABASE_SSL=true`, `DATABASE_POOL_MAX=2`, `DATABASE_CONNECTION_TIMEOUT_MS=4000`, `DATABASE_CONNECTION_ATTEMPTS=2`, `DEMO_MODE=false`, and `AUTH_REQUIRED=true` after provisioning the first institution administrator. The Postgres import, intervention, catalog, auth and audit paths are implemented behind the same route surface.
 
 The native `better-sqlite3` binary is explicitly included in the function bundle by `vercel.json`. If a Vercel build reports a native-module compatibility error, use the Render/Docker path documented below, or move the database to a managed service compatible with the repository interface.
 
