@@ -16,6 +16,7 @@ The repository contains a React/Vite client and an Express/TypeScript API in one
 - Seven data domains: academic (including optional subject performance), attendance (including optional subject-wise attendance), LMS, engagement, placement, skills and feedback.
 - Unified CSV template, validation preview, row-level errors, atomic/partial commit modes and import history.
 - Persistent SQLite interventions with category, rationale, owner, due date, status and history notes.
+- Authentication foundation with demo/production mode, password hashing, HttpOnly sessions, user roles and institution catalog APIs.
 - Methodology page documenting `heuristic-v1`, weights, coverage rules, exclusions and limitations.
 - Vitest scoring/import/API coverage and production client/server builds.
 
@@ -71,6 +72,17 @@ The repository is intentionally a single application with clear boundaries:
 
 The first server start creates `data/campusiq.db` and idempotently seeds the synthetic dataset. To use another database location, set `DATABASE_PATH`. SQLite files are ignored by Git.
 
+### Demo and production modes
+
+The backend now has an explicit operating-mode boundary:
+
+- `DEMO_MODE=true` (default locally) seeds the synthetic demonstration institution and a demo administrator account.
+- `DEMO_MODE=false` prevents synthetic student seeding. A managed database and an explicit user-provisioning workflow are required before enabling this in a real institution.
+- `AUTH_REQUIRED=false` preserves the public hackathon demo flow.
+- `AUTH_REQUIRED=true` protects the API and activates the faculty login screen. The current auth foundation uses signed-by-storage, opaque HttpOnly sessions and Node `scrypt` password hashes; the next production step is moving these tables from SQLite to managed Postgres.
+
+Demo credentials are controlled by `DEMO_ADMIN_EMAIL` and `DEMO_ADMIN_PASSWORD`; never reuse them for a real institution.
+
 Production-style local run:
 
 ```powershell
@@ -120,6 +132,11 @@ All JSON API responses use `{ data }`; failures use `{ error: { code, message, f
 | `GET /api/students` | Search/filter/sort student summaries |
 | `GET /api/students/:studentId` | Source values, explanation, segments and interventions |
 | `GET /api/methodology` | Published score version, formula and guardrails |
+| `GET /api/auth/config` | Auth mode and demo-mode metadata |
+| `GET /api/auth/me` | Current authenticated faculty session |
+| `POST /api/auth/login` / `POST /api/auth/logout` | Faculty session lifecycle |
+| `GET /api/catalog` | Institution departments and programmes |
+| `POST /api/catalog/departments` / `POST /api/catalog/programmes` | Admin/coordinator catalog management |
 | `GET /api/segments` | Segment definitions and filtered cohorts |
 | `GET /api/import/templates/unified` | Download supported CSV template |
 | `POST /api/imports/validate` | Multipart CSV preview and row-level errors |

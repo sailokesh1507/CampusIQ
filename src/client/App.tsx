@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { DashboardData, SegmentKey, Signal, StudentSummary } from '../shared/types.js';
+import type { AuthConfig, AuthUser, DashboardData, SegmentKey, Signal, StudentSummary } from '../shared/types.js';
 import { api } from './api/client.js';
-import { EMPTY_FILTERS, errorMessage, type FilterState, type Page } from './types.js';
+import { EMPTY_FILTERS, errorMessage, initials, type FilterState, type Page } from './types.js';
 import { Icon, type IconName } from './components/Icon.js';
 import { ThemeToggle } from './components/ThemeToggle.js';
 import { FilterBar } from './components/FilterBar.js';
@@ -13,6 +13,7 @@ import { Segments } from './pages/Segments.js';
 import { Imports } from './pages/Imports.js';
 import { Interventions } from './pages/Interventions.js';
 import { Methodology } from './pages/Methodology.js';
+import { AuthScreen } from './pages/AuthScreen.js';
 
 const navigation: Array<{ key: Page; label: string; icon: IconName; description: string }> = [
   { key: 'overview', label: 'Overview', icon: 'grid', description: 'Your campus, at a glance.' },
@@ -40,8 +41,17 @@ export default function App() {
   const [toast, setToast] = useState('');
   const [interventionStudent, setInterventionStudent] = useState('');
   const [search, setSearch] = useState('');
+  const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => { const timer = setTimeout(() => setSearch(filters.q), 250); return () => clearTimeout(timer); }, [filters.q]);
+  useEffect(() => {
+    const controller = new AbortController();
+    Promise.all([api<AuthConfig>('/api/auth/config', { signal: controller.signal }), api<{ user: AuthUser | null }>('/api/auth/me', { signal: controller.signal })])
+      .then(([config, session]) => { if (controller.signal.aborted) return; setAuthConfig(config); setAuthUser(session.user); }).catch(() => { if (!controller.signal.aborted) setAuthConfig({ required: false, demoMode: true, demoEmail: null }); }).finally(() => { if (!controller.signal.aborted) setAuthReady(true); });
+    return () => controller.abort();
+  }, []);
   const query = useMemo(() => new URLSearchParams(Object.entries({ ...filters, q: search }).filter(([, value]) => value)).toString(), [filters, search]);
   useEffect(() => {
     const controller = new AbortController();
@@ -76,17 +86,21 @@ export default function App() {
   const showSignal = (signal: Signal) => { setFilters((current) => ({ ...current, signal })); navigate('students'); };
   const currentPage = navigation.find((item) => item.key === page)!;
   const cohortPage = ['overview', 'students', 'segments'].includes(page);
+  const signOut = async () => { await api('/api/auth/logout', { method: 'POST' }).catch(() => undefined); setAuthUser(null); };
+
+  if (!authReady) return <div className="auth-loading"><span className="spinner" /></div>;
+  if (authConfig?.required && !authUser) return <AuthScreen config={authConfig} onAuthenticated={setAuthUser} />;
 
   return <div className="app-shell">
     <a className="skip-link" href="#main-content">Skip to content</a>
     {mobileNav && <button className="sidebar-overlay" onClick={() => setMobileNav(false)} aria-label="Close navigation" />}
     <aside className={`sidebar ${mobileNav ? 'sidebar-open' : ''}`} id="workspace-navigation">
       <a className="brand" href="#main-content" onClick={() => navigate('overview')} aria-label="CampusIQ overview"><span className="brand-mark"><Icon name="academic" size={24} /></span><span>Campus<span className="brand-iq">IQ</span><small>STUDENT SUCCESS INTELLIGENCE</small></span></a>
-      <div className="workspace-label"><span className="workspace-symbol"><Icon name="layers" size={19} /></span><div><strong>Faculty workspace</strong><small>Campus intelligence</small></div><span className="workspace-dot" /></div>
+      <div className="workspace-label"><span className="workspace-symbol"><Icon name="layers" size={19} /></span><div><strong>{authUser?.institutionName ?? 'Faculty workspace'}</strong><small>{authUser ? `${authUser.role} access` : 'Campus intelligence'}</small></div><span className="workspace-dot" /></div>
       <span className="nav-caption">WORKSPACE</span>
       <nav aria-label="Primary navigation">{navigation.map((item, i) => <button type="button" key={item.key} className={`nav-item ${page === item.key ? 'active' : ''} ${i === 4 ? 'nav-section-start' : ''}`} aria-current={page === item.key ? 'page' : undefined} onClick={() => { setInterventionStudent(''); navigate(item.key); }}><Icon name={item.icon} size={20} /><span>{item.label}</span>{page === item.key && <span className="nav-active-dot" />}</button>)}</nav>
       <div className="sidebar-note"><span className="icon-tile"><Icon name="sparkles" size={20} /></span><strong>Insight with intention.</strong><p>Good data starts the conversation. People make the difference.</p><button className="text-button" onClick={() => navigate('methodology')}>Explore the methodology<Icon name="arrow" size={15} /></button></div>
-      <div className="sidebar-foot"><span className="avatar">FA</span><div><strong>Faculty reviewer</strong><small>Demo workspace</small></div><Icon name="shield" size={17} /></div>
+      <div className="sidebar-foot"><span className="avatar">{authUser ? initials(authUser.displayName) : 'FA'}</span><div><strong>{authUser?.displayName ?? 'Faculty reviewer'}</strong><small>{authUser ? authUser.email : 'Demo workspace'}</small></div>{authUser ? <button className="icon-button" aria-label="Sign out" title="Sign out" onClick={signOut}><Icon name="arrow" size={17} /></button> : <Icon name="shield" size={17} />}</div>
     </aside>
     <div className="workspace-main">
       <header className="topbar"><div className="topbar-breadcrumb"><button className="icon-button menu-button" aria-label="Toggle navigation" aria-expanded={mobileNav} aria-controls="workspace-navigation" onClick={() => setMobileNav(!mobileNav)}><Icon name="menu" /></button><span>Workspace</span><Icon name="chevron" size={13} /><strong>{currentPage.label}</strong></div>
@@ -94,7 +108,7 @@ export default function App() {
       </header>
       <main id="main-content" className="main-content" tabIndex={-1}>
         <div className="page-header"><div><div className="eyebrow">YOUR STUDENT SUCCESS WORKSPACE</div><h1>{currentPage.label}<span className="heading-dot">.</span></h1><p>{currentPage.description}</p></div><div className="page-header-actions"><button className="icon-button refresh-button" aria-label="Refresh data" disabled={loading} onClick={() => setRefreshKey((value) => value + 1)}><Icon name="refresh" size={18} className={loading ? 'spinning' : ''} /></button>{page !== 'imports' && <button className="primary" onClick={() => navigate('imports')}><Icon name="plus" size={17} />Import data</button>}</div></div>
-        <div className="demo-banner"><span><span className="status-dot" />Synthetic demo data</span><span>Heuristic decision support<Icon name="info" size={13} /></span></div>
+        <div className="demo-banner"><span><span className="status-dot" />{authConfig?.demoMode ? 'Synthetic demo data' : 'Production workspace'}</span><span>Heuristic decision support<Icon name="info" size={13} /></span></div>
         {error && <ErrorBanner message={error} retry={() => setRefreshKey((value) => value + 1)} />}
         {cohortPage && <FilterBar filters={filters} onChange={(key, value) => setFilters((current) => ({ ...current, [key]: value }))} onReset={() => setFilters({ ...EMPTY_FILTERS })} cohort={cohort} loading={loading} />}
         <div className="page-transition" key={page} aria-busy={cohortPage && loading}>

@@ -10,6 +10,7 @@ import { METHODOLOGY } from '../shared/methodology.js';
 import type { DashboardData, Intervention, StudentRecord, StudentSummary } from '../shared/types.js';
 import { Database } from '../db/connection.js';
 import { seedDatabase } from '../db/seed.js';
+import { audit, authConfig, DEMO_INSTITUTION_ID, authMiddleware, clearSessionCookie, createSession, currentSessionToken, findUserByEmail, requireRole, setSessionCookie, verifyPassword, deleteSession } from '../auth/auth.js';
 import { unifiedTemplate } from '../import/templates.js';
 import { validateUnifiedCsv } from '../import/validators.js';
 import { getIntervention, getRecord, getRecords, getSnapshotId, listInterventions, refreshSnapshots, toSummary, upsertRecord } from './repository.js';
@@ -80,7 +81,7 @@ export function createApp(options: AppOptions): Express {
   seedDatabase(database);
   refreshSnapshots(database);
 
-  app.use(cors());
+  app.use(cors({ credentials: true }));
   app.use((req, res, next) => {
     const requestId = req.header('x-request-id')?.trim() || randomUUID();
     res.locals.requestId = requestId;
@@ -88,8 +89,57 @@ export function createApp(options: AppOptions): Express {
     next();
   });
   app.use(express.json({ limit: '1mb' }));
+  app.use(authMiddleware(database));
   app.get('/healthz', (_req: Request, res: Response) => response(res, { status: 'ok', service: 'campusiq', database: 'ready' }));
   app.get('/api/health', (_req: Request, res: Response) => response(res, { status: 'ok' }));
+
+  app.get('/api/auth/config', (_req, res) => response(res, authConfig()));
+  app.get('/api/auth/me', (req, res) => response(res, { user: req.authUser ?? null }));
+  app.post('/api/auth/login', (req, res) => {
+    const parsed = z.object({ email: z.string().trim().email(), password: z.string().min(1) }).safeParse(req.body);
+    if (!parsed.success) return failure(res, 'invalid_credentials', 'Enter a valid email and password.', 401);
+    const row = findUserByEmail(database, parsed.data.email);
+    if (!row || !row.active || !verifyPassword(parsed.data.password, row.password_hash)) return failure(res, 'invalid_credentials', 'The email or password is not correct.', 401);
+    const session = createSession(database, row.id);
+    const now = new Date().toISOString();
+    database.db.prepare('UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?').run(now, now, row.id);
+    setSessionCookie(res, session.token, session.expiresAt);
+    const user = { id: row.id, email: row.email, displayName: row.display_name, role: row.role, institutionId: row.institution_id, institutionName: row.institution_name };
+    audit(database, req, 'auth.login', 'user', row.id, { email: row.email });
+    return response(res, { user, expiresAt: session.expiresAt });
+  });
+  app.post('/api/auth/logout', (req, res) => {
+    const token = currentSessionToken(req);
+    if (token) { const userId = req.authUser?.id ?? null; deleteSession(database, token); if (userId) audit(database, req, 'auth.logout', 'user', userId); }
+    clearSessionCookie(res);
+    return response(res, { loggedOut: true });
+  });
+
+  app.get('/api/catalog', (req, res) => {
+    const institutionId = req.authUser?.institutionId ?? DEMO_INSTITUTION_ID;
+    const departments = database.db.prepare('SELECT id, code, name, active FROM departments WHERE institution_id = ? ORDER BY name').all(institutionId);
+    const programmes = database.db.prepare(`SELECT p.id, p.code, p.name, p.department_id AS departmentId, d.code AS departmentCode, p.active
+      FROM programmes p JOIN departments d ON d.id = p.department_id WHERE p.institution_id = ? ORDER BY p.name`).all(institutionId);
+    return response(res, { departments, programmes });
+  });
+  app.post('/api/catalog/departments', requireRole('admin', 'coordinator'), (req, res) => {
+    const parsed = z.object({ code: z.string().trim().min(2).max(24).regex(/^[A-Za-z0-9_-]+$/), name: z.string().trim().min(2).max(120) }).safeParse(req.body);
+    if (!parsed.success) return failure(res, 'validation_error', 'Department code and name are required.', 400, parsed.error.flatten().fieldErrors);
+    const institutionId = req.authUser!.institutionId; const id = randomUUID(); const now = new Date().toISOString();
+    try { database.db.prepare('INSERT INTO departments (id, institution_id, code, name, active, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)').run(id, institutionId, parsed.data.code.toUpperCase(), parsed.data.name, now, now); }
+    catch { return failure(res, 'catalog_conflict', 'A department with that code already exists.', 409); }
+    audit(database, req, 'catalog.department.create', 'department', id, parsed.data); return response(res, { id, code: parsed.data.code.toUpperCase(), name: parsed.data.name, active: true }, 201);
+  });
+  app.post('/api/catalog/programmes', requireRole('admin', 'coordinator'), (req, res) => {
+    const parsed = z.object({ code: z.string().trim().min(2).max(32).regex(/^[A-Za-z0-9_-]+$/), name: z.string().trim().min(2).max(120), departmentCode: z.string().trim().min(2).max(24) }).safeParse(req.body);
+    if (!parsed.success) return failure(res, 'validation_error', 'Programme code, name and department code are required.', 400, parsed.error.flatten().fieldErrors);
+    const department = database.db.prepare('SELECT id FROM departments WHERE institution_id = ? AND code = ? COLLATE NOCASE').get(req.authUser!.institutionId, parsed.data.departmentCode) as { id: string } | undefined;
+    if (!department) return failure(res, 'unknown_department', 'Create the department before adding a programme.', 422);
+    const id = randomUUID(); const now = new Date().toISOString();
+    try { database.db.prepare('INSERT INTO programmes (id, institution_id, department_id, code, name, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)').run(id, req.authUser!.institutionId, department.id, parsed.data.code.toUpperCase(), parsed.data.name, now, now); }
+    catch { return failure(res, 'catalog_conflict', 'A programme with that code already exists.', 409); }
+    audit(database, req, 'catalog.programme.create', 'programme', id, parsed.data); return response(res, { id, code: parsed.data.code.toUpperCase(), name: parsed.data.name, departmentId: department.id, active: true }, 201);
+  });
 
   app.get('/api/dashboard', (req, res) => response(res, dashboard(database, req.query as Record<string, string>)));
   app.get('/api/students', (req, res) => {
@@ -126,7 +176,7 @@ export function createApp(options: AppOptions): Express {
     const batchId = randomUUID();
     const accepted = parseRowsForCommit(validation);
     const stage = database.db.transaction(() => {
-      database.db.prepare('INSERT INTO import_batches (id, source_type, filename, mode, status, total_rows, accepted_rows, rejected_rows, initiated_by, payload_json, blocking_header_errors) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(batchId, 'unified', req.file!.originalname, mode, 'validated', validation.totalRows, accepted.length, validation.totalRows - accepted.length, 'demo faculty', JSON.stringify(accepted), validation.headersValid ? 0 : 1);
+      database.db.prepare('INSERT INTO import_batches (id, source_type, filename, mode, status, total_rows, accepted_rows, rejected_rows, initiated_by, institution_id, initiated_by_user_id, payload_json, blocking_header_errors) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(batchId, 'unified', req.file!.originalname, mode, 'validated', validation.totalRows, accepted.length, validation.totalRows - accepted.length, req.authUser?.displayName ?? 'Demo faculty', req.authUser?.institutionId ?? DEMO_INSTITUTION_ID, req.authUser?.id ?? null, JSON.stringify(accepted), validation.headersValid ? 0 : 1);
       const insertError = database.db.prepare('INSERT INTO import_errors (batch_id, row_number, field, code, message, raw_value) VALUES (?, ?, ?, ?, ?, ?)');
       for (const error of validation.errors) insertError.run(batchId, error.rowNumber, error.field, error.code, error.message, error.rawValue);
       const insertStaged = database.db.prepare('INSERT INTO import_staged_records (batch_id, row_number, record_json) VALUES (?, ?, ?)');
@@ -135,6 +185,7 @@ export function createApp(options: AppOptions): Express {
       }
     });
     stage();
+    audit(database, req, 'import.validate', 'import_batch', batchId, { filename: req.file.originalname, acceptedRows: accepted.length, rejectedRows: validation.totalRows - accepted.length });
     return response(res, { batchId, status: 'validated', totalRows: validation.totalRows, acceptedRows: accepted.length, rejectedRows: validation.totalRows - accepted.length, errors: validation.errors }, 201);
   });
   app.post('/api/imports/:batchId/commit', (req, res) => {
@@ -153,6 +204,7 @@ export function createApp(options: AppOptions): Express {
     const commit = database.db.transaction(() => { for (const record of records) upsertRecord(database, record, req.params.batchId); database.db.prepare('UPDATE import_batches SET status = ?, imported_at = ? WHERE id = ?').run('committed', new Date().toISOString(), req.params.batchId); });
     commit();
     refreshSnapshots(database);
+    audit(database, req, 'import.commit', 'import_batch', req.params.batchId, { importedRows: records.length });
     return response(res, { batchId: req.params.batchId, status: 'committed', importedRows: records.length, recalculatedStudents: getRecords(database).length });
   });
   app.get('/api/imports', (_req, res) => response(res, database.db.prepare('SELECT * FROM import_batches ORDER BY COALESCE(imported_at, rowid) DESC').all()));
@@ -164,7 +216,8 @@ export function createApp(options: AppOptions): Express {
     if (!parsed.success) return failure(res, 'validation_error', 'Review the required intervention fields.', 400, parsed.error.flatten().fieldErrors);
     if (!getRecord(database, parsed.data.studentId)) return failure(res, 'unknown_student', 'The selected student does not exist.', 422, { studentId: ['Unknown student ID'] });
     const id = randomUUID(); const now = new Date().toISOString();
-    database.db.prepare('INSERT INTO interventions (id, student_id, score_snapshot_id, category, title, rationale, owner, due_date, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(id, parsed.data.studentId, parsed.data.scoreSnapshotId ?? getSnapshotId(database, parsed.data.studentId), parsed.data.category, parsed.data.title, parsed.data.rationale, parsed.data.owner, parsed.data.dueDate, parsed.data.status, now, now);
+    database.db.prepare('INSERT INTO interventions (id, student_id, score_snapshot_id, category, title, rationale, owner, due_date, status, institution_id, created_by_user_id, updated_by_user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(id, parsed.data.studentId, parsed.data.scoreSnapshotId ?? getSnapshotId(database, parsed.data.studentId), parsed.data.category, parsed.data.title, parsed.data.rationale, parsed.data.owner, parsed.data.dueDate, parsed.data.status, req.authUser?.institutionId ?? DEMO_INSTITUTION_ID, req.authUser?.id ?? null, req.authUser?.id ?? null, now, now);
+    audit(database, req, 'intervention.create', 'intervention', id, { studentId: parsed.data.studentId, category: parsed.data.category });
     return response(res, getIntervention(database, id), 201);
   });
   app.patch('/api/interventions/:id', (req, res) => {
@@ -175,10 +228,11 @@ export function createApp(options: AppOptions): Express {
     const transitions: Record<Intervention['status'], Intervention['status'][]> = { open: ['in_progress', 'cancelled'], in_progress: ['completed', 'cancelled'], completed: [], cancelled: [] };
     if (patch.data.status && patch.data.status !== current.status && !transitions[current.status].includes(patch.data.status)) return failure(res, 'invalid_transition', `An intervention in ${current.status} cannot move to ${patch.data.status}.`, 422);
     const updated = { ...current, ...patch.data }; const now = new Date().toISOString();
-    database.db.prepare('UPDATE interventions SET title = ?, rationale = ?, owner = ?, due_date = ?, status = ?, updated_at = ? WHERE id = ?').run(updated.title, updated.rationale, updated.owner, updated.dueDate, updated.status, now, current.id);
+    database.db.prepare('UPDATE interventions SET title = ?, rationale = ?, owner = ?, due_date = ?, status = ?, updated_by_user_id = ?, updated_at = ? WHERE id = ?').run(updated.title, updated.rationale, updated.owner, updated.dueDate, updated.status, req.authUser?.id ?? null, now, current.id);
     if (patch.data.status && patch.data.status !== current.status) {
-      database.db.prepare('INSERT INTO intervention_notes (id, intervention_id, body, author, created_at) VALUES (?, ?, ?, ?, ?)').run(randomUUID(), current.id, `Status changed from ${current.status} to ${patch.data.status}.`, patch.data.actor, now);
+      database.db.prepare('INSERT INTO intervention_notes (id, intervention_id, body, author, created_at) VALUES (?, ?, ?, ?, ?)').run(randomUUID(), current.id, `Status changed from ${current.status} to ${patch.data.status}.`, req.authUser?.displayName ?? patch.data.actor, now);
     }
+    audit(database, req, 'intervention.update', 'intervention', current.id, { status: updated.status });
     return response(res, getIntervention(database, current.id));
   });
   app.post('/api/interventions/:id/notes', (req, res) => {
@@ -186,7 +240,9 @@ export function createApp(options: AppOptions): Express {
     if (!current) return failure(res, 'not_found', 'Intervention was not found.', 404);
     const parsed = z.object({ body: z.string().trim().min(1).max(2000), author: z.string().trim().min(1).max(120).default('Faculty reviewer') }).safeParse(req.body);
     if (!parsed.success) return failure(res, 'validation_error', 'A note body is required and must be under 2,000 characters.', 400, parsed.error.flatten().fieldErrors);
-    database.db.prepare('INSERT INTO intervention_notes (id, intervention_id, body, author, created_at) VALUES (?, ?, ?, ?, ?)').run(randomUUID(), current.id, parsed.data.body, parsed.data.author, new Date().toISOString());
+    const author = req.authUser?.displayName ?? parsed.data.author;
+    database.db.prepare('INSERT INTO intervention_notes (id, intervention_id, body, author, created_at) VALUES (?, ?, ?, ?, ?)').run(randomUUID(), current.id, parsed.data.body, author, new Date().toISOString());
+    audit(database, req, 'intervention.note.create', 'intervention', current.id);
     return response(res, getIntervention(database, current.id));
   });
 

@@ -1,8 +1,36 @@
 import { randomUUID } from 'node:crypto';
 import { Database } from './connection.js';
 import { buildSyntheticRecords } from './seed-data.js';
+import { DEMO_INSTITUTION_ID, DEMO_INSTITUTION_NAME, demoCredentials, authConfig, hashPassword } from '../auth/auth.js';
+
+export function seedIdentity(database: Database): void {
+  const now = new Date().toISOString();
+  database.db.prepare(`INSERT INTO institutions (id, name, slug, active, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET name=excluded.name, updated_at=excluded.updated_at`).run(DEMO_INSTITUTION_ID, DEMO_INSTITUTION_NAME, 'demo-campus', now, now);
+
+  const catalog = [
+    { department: 'CSE', departmentName: 'Computer Science', programme: 'BTECH-CSE', programmeName: 'B.Tech Computer Science' },
+    { department: 'IS', departmentName: 'Information Systems', programme: 'BBA-BA', programmeName: 'BBA Business Analytics' },
+    { department: 'ECE', departmentName: 'Electronics & Communication', programme: 'BTECH-ECE', programmeName: 'B.Tech Electronics' },
+  ];
+  for (const item of catalog) {
+    const departmentId = `dept-${item.department.toLowerCase()}`;
+    database.db.prepare(`INSERT INTO departments (id, institution_id, code, name, active, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?)
+      ON CONFLICT(institution_id, code) DO UPDATE SET name=excluded.name, updated_at=excluded.updated_at`).run(departmentId, DEMO_INSTITUTION_ID, item.department, item.departmentName, now, now);
+    database.db.prepare(`INSERT INTO programmes (id, institution_id, department_id, code, name, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+      ON CONFLICT(institution_id, code) DO UPDATE SET department_id=excluded.department_id, name=excluded.name, updated_at=excluded.updated_at`).run(`programme-${item.programme.toLowerCase()}`, DEMO_INSTITUTION_ID, departmentId, item.programme, item.programmeName, now, now);
+  }
+
+  if (authConfig().demoMode) {
+    const credentials = demoCredentials();
+    const existing = database.db.prepare('SELECT id FROM users WHERE email = ? COLLATE NOCASE').get(credentials.email) as { id: string } | undefined;
+    if (!existing) database.db.prepare(`INSERT INTO users (id, institution_id, email, display_name, password_hash, role, active, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 'admin', 1, ?, ?)`).run('demo-admin', DEMO_INSTITUTION_ID, credentials.email, 'Demo Faculty Administrator', hashPassword(credentials.password), now, now);
+  }
+}
 
 export function seedDatabase(database: Database): void {
+  seedIdentity(database);
   const existing = database.db.prepare('SELECT COUNT(*) as count FROM students').get() as { count: number };
   const records = buildSyntheticRecords();
   if (existing.count > 0) {

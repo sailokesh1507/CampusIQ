@@ -21,6 +21,7 @@ flowchart LR
 - `src/analytics` is pure TypeScript. `calculateScore` accepts a normalized `StudentRecord` and returns a repeatable explanation.
 - `src/import` validates the unified CSV before a transaction writes source records.
 - `src/shared` contains domain types and methodology metadata shared by API and client.
+- `src/auth` contains the authentication boundary: environment mode, demo identity bootstrap, password hashing, opaque sessions, role checks and audit helpers.
 
 ## Data lifecycle
 
@@ -32,5 +33,9 @@ flowchart LR
 6. `refreshSnapshots` recalculates each score, explanation and segment membership.
 7. Dashboard/profile routes derive their response from current source rows and deterministic analytics.
 8. Intervention updates write the current record and status/note history in SQLite.
+
+## Production boundary
+
+The demo currently runs on SQLite so a fresh clone is easy to evaluate. `DEMO_MODE` controls synthetic seeding and `AUTH_REQUIRED` controls whether API routes require a faculty session. Authentication, institution catalog, membership and audit tables are already present in the schema. Before real student data is used, move these tables and source data to managed Postgres, provision users through a controlled admin flow, and enable `AUTH_REQUIRED=true`.
 
 The validated import payload is staged in SQLite with immutable batch metadata/errors, so a restart or another Node process can complete a preview on the same persistent database. Vercel's default `/tmp` database remains ephemeral; use a persistent disk/database for durable imports and interventions.

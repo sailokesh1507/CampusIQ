@@ -9,4 +9,5 @@
 - [x] Intervention status/note persistence is covered by API integration tests.
 - [x] `/healthz`, `Dockerfile`, `render.yaml`, `.env.example` and deployment limitations are documented.
 - [x] Hosted URL provisioned and smoke-tested: https://campusiq-eight.vercel.app
+- [x] Authentication/session/catalog foundation is covered by API integration tests while demo mode remains safe for judges.
 - [ ] Complete final hosted smoke test, demo rehearsal and submission form.

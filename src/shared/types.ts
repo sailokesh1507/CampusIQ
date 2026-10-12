@@ -1,5 +1,6 @@
 export type SupportLevel = 'insufficient' | 'none' | 'watch' | 'needs_review';
 export type Signal = 'academic' | 'attendance' | 'learning' | 'placement';
+export type UserRole = 'admin' | 'faculty' | 'coordinator' | 'viewer';
 export type SegmentKey =
   | 'high-academic-low-placement'
   | 'attendance-academic-support'
@@ -135,3 +136,34 @@ export interface DashboardData {
 }
 
 export interface ImportError { rowNumber: number; field: string; code: string; message: string; rawValue: string; }
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  displayName: string;
+  role: UserRole;
+  institutionId: string;
+  institutionName: string;
+}
+
+export interface AuthConfig {
+  required: boolean;
+  demoMode: boolean;
+  demoEmail: string | null;
+}
+
+export interface DepartmentCatalogItem {
+  id: string;
+  code: string;
+  name: string;
+  active: boolean;
+}
+
+export interface ProgrammeCatalogItem {
+  id: string;
+  code: string;
+  name: string;
+  departmentId: string;
+  departmentCode: string;
+  active: boolean;
+}
