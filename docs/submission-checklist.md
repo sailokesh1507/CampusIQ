@@ -1,6 +1,6 @@
 # Submission checklist
 
-- [x] React/Vite frontend and Express/SQLite backend run from the repository.
+- [x] React/Vite frontend and Express backend run from the repository with SQLite demo and managed Postgres production adapters.
 - [x] Synthetic demo dataset is clearly disclosed and seeded idempotently.
 - [x] All seven official data domains are represented.
 - [x] Deterministic `heuristic-v1` score, coverage, component contributions and risk explanations are documented and tested.
@@ -10,4 +10,5 @@
 - [x] `/healthz`, `Dockerfile`, `render.yaml`, `.env.example` and deployment limitations are documented.
 - [x] Hosted URL provisioned and smoke-tested: https://campusiq-eight.vercel.app
 - [x] Authentication/session/catalog foundation is covered by API integration tests while demo mode remains safe for judges.
-- [ ] Complete final hosted smoke test, demo rehearsal and submission form.
+- [x] Complete final hosted smoke test and live Postgres write-path rehearsal.
+- [ ] Complete demo rehearsal and submission form.

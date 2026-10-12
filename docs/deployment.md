@@ -4,7 +4,7 @@
 
 Live production URL: **https://campusiq-eight.vercel.app**
 
-Vercel serves the Vite client from `public/` and routes `/healthz` and `/api/*` through the catch-all Express adapter in `api/index.ts`. The adapter preserves the original request path for the shared app. Deploy from the repository with:
+Vercel serves the Vite client from `public/` and routes `/healthz` and `/api/*` through the catch-all Express adapter in `api/index.ts`. The Postgres-backed production function is pinned to `bom1` near the Supabase project region. The adapter preserves the original request path for the shared app. Deploy from the repository with:
 
 ```text
 npx vercel@latest login
@@ -19,7 +19,7 @@ The native `better-sqlite3` binary is explicitly included in the function bundle
 
 After deployment, verify the URL at `/healthz`, `/`, `/api/dashboard`, `/api/students/SYN-007`, and the intervention workflow. The current deployment has been smoke-tested for dashboard, profile, methodology, CSV template, CSV validation/commit, refresh, and intervention CRUD.
 
-For a managed Postgres release, set `DATABASE_DRIVER=postgres` and a temporary `DATABASE_URL` in the shell, then run `npm run db:migrate:postgres`, `npm run db:check:postgres`, and `npm run smoke:postgres`. The Postgres smoke script creates isolated temporary institutions, verifies login, imports, interventions and institution isolation, and deletes those records before exiting.
+For a managed Postgres release, set `DATABASE_DRIVER=postgres` and a temporary `DATABASE_URL` in the shell, then run `npm run db:migrate:postgres`, `npm run db:seed:postgres`, `npm run db:check:postgres`, and `npm run smoke:postgres`. The Postgres smoke script creates isolated temporary institutions, verifies login, imports, interventions and institution isolation, and deletes those records before exiting. After a one-time hosted seed, keep `POSTGRES_SEED_DEMO=false` to avoid repeating seed work on serverless cold starts.
 
 ## Single-service deployment
 

@@ -129,9 +129,12 @@ Managed Postgres verification requires a temporary `DATABASE_URL` environment va
 
 ```powershell
 npm run db:migrate:postgres
+npm run db:seed:postgres
 npm run db:check:postgres
 npm run smoke:postgres
 ```
+
+For the public synthetic Postgres demo, seed the database once with `db:seed:postgres`, then keep `POSTGRES_SEED_DEMO=false` in the hosted environment so serverless cold starts do not repeat the seed operation.
 
 To remove reproducible build output without touching source, dependencies, the local database, or the Vercel link:
 
