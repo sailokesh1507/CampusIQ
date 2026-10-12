@@ -21,6 +21,7 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:migrate:postgres": "node scripts/migrate-postgres.mjs",
     "db:check:postgres": "node scripts/check-postgres.mjs",
+    "smoke:postgres": "tsx scripts/smoke-postgres.ts",
     "clean": "node scripts/clean.mjs",
     "verify": "npm run typecheck && npm test && npm run build",
     "smoke:live": "node scripts/smoke.mjs https://campusiq-eight.vercel.app",

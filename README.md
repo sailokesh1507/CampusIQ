@@ -125,6 +125,14 @@ npm run smoke:live
 npm run deploy:vercel
 ```
 
+Managed Postgres verification requires a temporary `DATABASE_URL` environment value and removes its smoke data:
+
+```powershell
+npm run db:migrate:postgres
+npm run db:check:postgres
+npm run smoke:postgres
+```
+
 To remove reproducible build output without touching source, dependencies, the local database, or the Vercel link:
 
 ```powershell

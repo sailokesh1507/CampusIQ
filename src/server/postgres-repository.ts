@@ -10,6 +10,7 @@ type Queryable = pg.Pool | pg.PoolClient;
 type Row = Record<string, unknown>;
 const numberOrNull = (value: unknown): number | null => value === null || value === undefined ? null : Number(value);
 const stringOrNull = (value: unknown): string | null => value === null || value === undefined ? null : String(value);
+const dateOnly = (value: unknown): string => value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
 
 export async function getPostgresRecord(database: PostgresDatabase, institutionId: string, studentId: string, queryable: Queryable = database.pool): Promise<StudentRecord | null> {
   const result = await queryable.query(`SELECT s.*, d.name AS department_name, p.name AS programme_name
@@ -76,7 +77,7 @@ export interface PostgresIntervention extends Intervention { institutionId: stri
 
 async function mapPostgresIntervention(database: PostgresDatabase, row: Row, queryable: Queryable = database.pool): Promise<PostgresIntervention> {
   const notes = await queryable.query('SELECT id,body,author,created_at FROM intervention_notes WHERE intervention_id=$1 ORDER BY created_at', [row.id]);
-  return { id: String(row.id), studentId: String(row.external_student_id), studentName: stringOrNull(row.display_name) ?? undefined, scoreSnapshotId: stringOrNull(row.score_snapshot_id), category: row.category as Intervention['category'], title: String(row.title), rationale: String(row.rationale), owner: String(row.owner), dueDate: String(row.due_date), status: row.status as Intervention['status'], createdAt: String(row.created_at), updatedAt: String(row.updated_at), notes: notes.rows.map((note) => ({ id: String(note.id), body: String(note.body), author: String(note.author), createdAt: String(note.created_at) })), institutionId: String(row.institution_id), createdByUserId: stringOrNull(row.created_by_user_id), updatedByUserId: stringOrNull(row.updated_by_user_id) };
+  return { id: String(row.id), studentId: String(row.external_student_id), studentName: stringOrNull(row.display_name) ?? undefined, scoreSnapshotId: stringOrNull(row.score_snapshot_id), category: row.category as Intervention['category'], title: String(row.title), rationale: String(row.rationale), owner: String(row.owner), dueDate: dateOnly(row.due_date), status: row.status as Intervention['status'], createdAt: String(row.created_at), updatedAt: String(row.updated_at), notes: notes.rows.map((note) => ({ id: String(note.id), body: String(note.body), author: String(note.author), createdAt: String(note.created_at) })), institutionId: String(row.institution_id), createdByUserId: stringOrNull(row.created_by_user_id), updatedByUserId: stringOrNull(row.updated_by_user_id) };
 }
 
 export async function listPostgresInterventions(database: PostgresDatabase, institutionId: string): Promise<PostgresIntervention[]> {

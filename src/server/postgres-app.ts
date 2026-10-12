@@ -59,6 +59,7 @@ function parseRowsForCommit(validation: ReturnType<typeof validateUnifiedCsv>): 
 
 export function createPostgresApp(options: AppOptions): Express {
   const app = express(); const database = new PostgresDatabase(options.databaseUrl);
+  app.locals.postgresDatabase = database;
   app.disable('x-powered-by'); app.use(cors({ credentials: true }));
   app.use((req, res, next) => { const requestId = req.header('x-request-id')?.trim() || randomUUID(); res.locals.requestId = requestId; res.setHeader('x-request-id', requestId); next(); });
   app.use(express.json({ limit: '1mb' }));

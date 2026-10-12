@@ -19,6 +19,8 @@ The native `better-sqlite3` binary is explicitly included in the function bundle
 
 After deployment, verify the URL at `/healthz`, `/`, `/api/dashboard`, `/api/students/SYN-007`, and the intervention workflow. The current deployment has been smoke-tested for dashboard, profile, methodology, CSV template, CSV validation/commit, refresh, and intervention CRUD.
 
+For a managed Postgres release, set `DATABASE_DRIVER=postgres` and a temporary `DATABASE_URL` in the shell, then run `npm run db:migrate:postgres`, `npm run db:check:postgres`, and `npm run smoke:postgres`. The Postgres smoke script creates isolated temporary institutions, verifies login, imports, interventions and institution isolation, and deletes those records before exiting.
+
 ## Single-service deployment
 
 The API serves `public` in production. Build and start commands are:
