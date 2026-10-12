@@ -26,11 +26,11 @@ flowchart LR
 
 1. App startup initializes tables and seeds 54 synthetic records when the database is empty.
 2. A CSV is parsed and checked without mutating source data.
-3. The validation response stores a batch preview and row-level errors.
+3. The validation response stores its accepted normalized rows, header state and row-level errors in the import batch. Commit is therefore not tied to one Node process.
 4. Atomic mode requires zero row errors. Partial mode explicitly commits only valid rows.
 5. Accepted records upsert on stable `student_id` and `(student_id, observed_at)` domain observations.
 6. `refreshSnapshots` recalculates each score, explanation and segment membership.
 7. Dashboard/profile routes derive their response from current source rows and deterministic analytics.
 8. Intervention updates write the current record and status/note history in SQLite.
 
-The current prototype keeps a validation preview in server memory while the immutable batch metadata/errors are persisted. A deployment with multiple API instances should move preview payloads to a persistent staging table or object store.
+The validated import payload is staged in SQLite with immutable batch metadata/errors, so a restart or another Node process can complete a preview on the same persistent database. Vercel's default `/tmp` database remains ephemeral; use a persistent disk/database for durable imports and interventions.

@@ -15,6 +15,11 @@ export interface AcademicMetrics {
 }
 
 export interface AttendanceMetrics { overallPercent: number | null; }
+export interface SubjectMetric {
+  subjectCode: string;
+  marksPercent: number | null;
+  attendancePercent: number | null;
+}
 export interface LmsMetrics { loginCount: number | null; assignmentCompletionPercent: number | null; }
 export interface EngagementMetrics {
   eventsCount: number | null;
@@ -41,6 +46,7 @@ export interface StudentRecord {
   observedAt: string;
   academic: AcademicMetrics;
   attendance: AttendanceMetrics;
+  subjectMetrics: SubjectMetric[];
   lms: LmsMetrics;
   engagement: EngagementMetrics;
   placement: PlacementMetrics;

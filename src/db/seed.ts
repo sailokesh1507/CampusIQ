@@ -4,8 +4,11 @@ import { buildSyntheticRecords } from './seed-data.js';
 
 export function seedDatabase(database: Database): void {
   const existing = database.db.prepare('SELECT COUNT(*) as count FROM students').get() as { count: number };
-  if (existing.count > 0) return;
   const records = buildSyntheticRecords();
+  if (existing.count > 0) {
+    seedSubjectMetrics(database, records);
+    return;
+  }
   const now = new Date().toISOString();
   const insert = database.db.transaction(() => {
     for (const student of records) {
@@ -18,6 +21,8 @@ export function seedDatabase(database: Database): void {
       database.db.prepare(`INSERT INTO academic_metrics (student_id, observed_at, cgpa, cgpa_scale, marks_percent, backlogs, source_batch_id)
         VALUES (@studentId, @observedAt, @cgpa, @cgpaScale, @marksPercent, @backlogs, @sourceBatchId)`).run({ ...source, cgpa: student.academic.cgpa, cgpaScale: student.academic.cgpaScale, marksPercent: student.academic.marksPercent, backlogs: student.academic.backlogs });
       database.db.prepare(`INSERT INTO attendance_metrics (student_id, observed_at, overall_percent, source_batch_id) VALUES (@studentId, @observedAt, @overallPercent, @sourceBatchId)`).run({ ...source, overallPercent: student.attendance.overallPercent });
+      const insertSubject = database.db.prepare('INSERT OR IGNORE INTO subject_metrics (student_id, observed_at, subject_code, marks_percent, attendance_percent, source_batch_id) VALUES (?, ?, ?, ?, ?, ?)');
+      for (const subject of student.subjectMetrics) insertSubject.run(student.studentId, student.observedAt, subject.subjectCode, subject.marksPercent, subject.attendancePercent, source.sourceBatchId);
       database.db.prepare(`INSERT INTO lms_metrics (student_id, observed_at, login_count, assignment_completion_percent, source_batch_id) VALUES (@studentId, @observedAt, @loginCount, @assignmentCompletionPercent, @sourceBatchId)`).run({ ...source, loginCount: student.lms.loginCount, assignmentCompletionPercent: student.lms.assignmentCompletionPercent });
       database.db.prepare(`INSERT INTO engagement_metrics (student_id, observed_at, events_count, clubs_count, hackathons_count, certifications_count, source_batch_id) VALUES (@studentId, @observedAt, @eventsCount, @clubsCount, @hackathonsCount, @certificationsCount, @sourceBatchId)`).run({ ...source, eventsCount: student.engagement.eventsCount, clubsCount: student.engagement.clubsCount, hackathonsCount: student.engagement.hackathonsCount, certificationsCount: student.engagement.certificationsCount });
       database.db.prepare(`INSERT INTO placement_metrics (student_id, observed_at, aptitude_score, coding_score, mock_interview_score, source_batch_id) VALUES (@studentId, @observedAt, @aptitudeScore, @codingScore, @mockInterviewScore, @sourceBatchId)`).run({ ...source, aptitudeScore: student.placement.aptitudeScore, codingScore: student.placement.codingScore, mockInterviewScore: student.placement.mockInterviewScore });
@@ -32,6 +37,14 @@ export function seedDatabase(database: Database): void {
     for (const item of interventions) database.db.prepare(`INSERT INTO interventions (id, student_id, score_snapshot_id, category, title, rationale, owner, due_date, status, created_at, updated_at) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`).run(randomUUID(), item.studentId, item.category, item.title, item.rationale, item.owner, item.dueDate, item.status, now, now);
   });
   insert();
+}
+
+function seedSubjectMetrics(database: Database, records: ReturnType<typeof buildSyntheticRecords>): void {
+  const insert = database.db.prepare('INSERT OR IGNORE INTO subject_metrics (student_id, observed_at, subject_code, marks_percent, attendance_percent, source_batch_id) VALUES (?, ?, ?, ?, ?, ?)');
+  const transaction = database.db.transaction(() => {
+    for (const student of records) for (const subject of student.subjectMetrics) insert.run(student.studentId, student.observedAt, subject.subjectCode, subject.marksPercent, subject.attendancePercent, 'synthetic-demo-seed');
+  });
+  transaction();
 }
 
 if (process.argv[1]?.endsWith('seed.ts')) {

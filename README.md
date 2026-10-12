@@ -13,7 +13,7 @@ The repository contains a React/Vite client and an Express/TypeScript API in one
 - Live overview KPIs, priority queue, review signals and overlapping cohort segments.
 - Searchable student explorer with support flags, coverage and segment membership.
 - Student profile drawer with source evidence, missing indicators, score contributions and signal rules.
-- Seven data domains: academic, attendance, LMS, engagement, placement, skills and feedback.
+- Seven data domains: academic (including optional subject performance), attendance (including optional subject-wise attendance), LMS, engagement, placement, skills and feedback.
 - Unified CSV template, validation preview, row-level errors, atomic/partial commit modes and import history.
 - Persistent SQLite interventions with category, rationale, owner, due date, status and history notes.
 - Methodology page documenting `heuristic-v1`, weights, coverage rules, exclusions and limitations.
@@ -91,7 +91,7 @@ All JSON API responses use `{ data }`; failures use `{ error: { code, message, f
 
 ## CSV import
 
-The unified CSV requires `student_id`, `observed_at` and at least one measurable value. The remaining supported headers are documented in [`docs/data-dictionary.md`](docs/data-dictionary.md). Values are range checked; blank optionals become `NULL`; `cgpa_scale` is required when `cgpa` is supplied; unknown headers, duplicate observations and malformed dates are surfaced. Atomic mode blocks any row error; partial mode commits only accepted rows after an explicit choice.
+The unified CSV requires `student_id`, `observed_at` and at least one measurable value. It supports optional `subject_performance` and `subject_attendance` evidence using `SUBJECT_CODE:0-100;...`. The remaining supported headers are documented in [`docs/data-dictionary.md`](docs/data-dictionary.md). Values are range checked; blank optionals become `NULL`; `cgpa_scale` is required when `cgpa` is supplied; unknown headers, duplicate observations and malformed dates are surfaced. Atomic mode blocks any row error; partial mode commits only accepted rows after an explicit choice. Validated rows are staged in the database rather than Node memory, so a commit is safe across Node-process restarts when the database itself is persistent.
 
 ## Deployment
 

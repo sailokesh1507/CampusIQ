@@ -29,6 +29,12 @@ export class Database {
         overall_percent REAL, source_batch_id TEXT, UNIQUE(student_id, observed_at),
         FOREIGN KEY(student_id) REFERENCES students(student_id) ON DELETE CASCADE
       );
+      CREATE TABLE IF NOT EXISTS subject_metrics (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, student_id TEXT NOT NULL, observed_at TEXT NOT NULL,
+        subject_code TEXT NOT NULL, marks_percent REAL, attendance_percent REAL, source_batch_id TEXT,
+        UNIQUE(student_id, observed_at, subject_code),
+        FOREIGN KEY(student_id) REFERENCES students(student_id) ON DELETE CASCADE
+      );
       CREATE TABLE IF NOT EXISTS lms_metrics (
         id INTEGER PRIMARY KEY AUTOINCREMENT, student_id TEXT NOT NULL, observed_at TEXT NOT NULL,
         login_count INTEGER, assignment_completion_percent REAL, source_batch_id TEXT,
@@ -72,7 +78,8 @@ export class Database {
       CREATE TABLE IF NOT EXISTS import_batches (
         id TEXT PRIMARY KEY, source_type TEXT NOT NULL, filename TEXT NOT NULL, mode TEXT NOT NULL,
         status TEXT NOT NULL, total_rows INTEGER NOT NULL, accepted_rows INTEGER NOT NULL DEFAULT 0,
-        rejected_rows INTEGER NOT NULL DEFAULT 0, imported_at TEXT, initiated_by TEXT NOT NULL
+        rejected_rows INTEGER NOT NULL DEFAULT 0, imported_at TEXT, initiated_by TEXT NOT NULL,
+        payload_json TEXT, blocking_header_errors INTEGER NOT NULL DEFAULT 0
       );
       CREATE TABLE IF NOT EXISTS import_errors (
         id INTEGER PRIMARY KEY AUTOINCREMENT, batch_id TEXT NOT NULL, row_number INTEGER NOT NULL,
@@ -85,9 +92,17 @@ export class Database {
         FOREIGN KEY(batch_id) REFERENCES import_batches(id) ON DELETE CASCADE
       );
       CREATE INDEX IF NOT EXISTS idx_students_department ON students(department);
+      CREATE INDEX IF NOT EXISTS idx_subject_metrics_student_observed ON subject_metrics(student_id, observed_at DESC);
       CREATE INDEX IF NOT EXISTS idx_interventions_status_due ON interventions(status, due_date);
       CREATE INDEX IF NOT EXISTS idx_import_staged_batch ON import_staged_records(batch_id, row_number);
     `);
+    this.ensureColumn('import_batches', 'payload_json', 'TEXT');
+    this.ensureColumn('import_batches', 'blocking_header_errors', 'INTEGER NOT NULL DEFAULT 0');
+  }
+
+  private ensureColumn(table: 'import_batches', column: string, definition: string): void {
+    const columns = this.db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    if (!columns.some((item) => item.name === column)) this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   }
 
   close(): void { this.db.close(); }

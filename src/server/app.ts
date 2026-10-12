@@ -126,7 +126,7 @@ export function createApp(options: AppOptions): Express {
     const batchId = randomUUID();
     const accepted = parseRowsForCommit(validation);
     const stage = database.db.transaction(() => {
-      database.db.prepare('INSERT INTO import_batches (id, source_type, filename, mode, status, total_rows, accepted_rows, rejected_rows, initiated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(batchId, 'unified', req.file!.originalname, mode, 'validated', validation.totalRows, accepted.length, validation.totalRows - accepted.length, 'demo faculty');
+      database.db.prepare('INSERT INTO import_batches (id, source_type, filename, mode, status, total_rows, accepted_rows, rejected_rows, initiated_by, payload_json, blocking_header_errors) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(batchId, 'unified', req.file!.originalname, mode, 'validated', validation.totalRows, accepted.length, validation.totalRows - accepted.length, 'demo faculty', JSON.stringify(accepted), validation.headersValid ? 0 : 1);
       const insertError = database.db.prepare('INSERT INTO import_errors (batch_id, row_number, field, code, message, raw_value) VALUES (?, ?, ?, ?, ?, ?)');
       for (const error of validation.errors) insertError.run(batchId, error.rowNumber, error.field, error.code, error.message, error.rawValue);
       const insertStaged = database.db.prepare('INSERT INTO import_staged_records (batch_id, row_number, record_json) VALUES (?, ?, ?)');
@@ -138,14 +138,18 @@ export function createApp(options: AppOptions): Express {
     return response(res, { batchId, status: 'validated', totalRows: validation.totalRows, acceptedRows: accepted.length, rejectedRows: validation.totalRows - accepted.length, errors: validation.errors }, 201);
   });
   app.post('/api/imports/:batchId/commit', (req, res) => {
-    const batch = database.db.prepare('SELECT * FROM import_batches WHERE id = ?').get(req.params.batchId) as { status: string; rejected_rows: number; mode: string } | undefined;
+    const batch = database.db.prepare('SELECT * FROM import_batches WHERE id = ?').get(req.params.batchId) as { status: string; rejected_rows: number; mode: 'atomic' | 'partial'; payload_json: string | null; blocking_header_errors: number } | undefined;
     if (!batch) return failure(res, 'batch_not_found', 'Import batch does not exist.', 404);
     if (batch.status !== 'validated') return failure(res, 'batch_not_committable', 'This import batch has already been committed or is no longer available for commit.', 409);
     const hasHeaderErrors = Boolean((database.db.prepare('SELECT 1 FROM import_errors WHERE batch_id = ? AND row_number = 1 LIMIT 1').get(req.params.batchId)));
-    if (hasHeaderErrors) return failure(res, 'blocking_errors', 'The CSV header contract is invalid. Download the unified template and correct the headers before committing.', 422);
+    if (batch.blocking_header_errors || hasHeaderErrors) return failure(res, 'blocking_errors', 'The CSV header contract is invalid. Download the unified template and correct the headers before committing.', 422);
     if (batch.rejected_rows > 0 && batch.mode === 'atomic') return failure(res, 'blocking_errors', 'Atomic import cannot commit while row errors remain. Choose partial mode after reviewing the errors.', 422);
     const stagedRows = database.db.prepare('SELECT record_json as recordJson FROM import_staged_records WHERE batch_id = ? ORDER BY row_number').all(req.params.batchId) as Array<{ recordJson: string }>;
-    const records = stagedRows.map(({ recordJson }) => JSON.parse(recordJson) as StudentRecord);
+    let records = stagedRows.map(({ recordJson }) => JSON.parse(recordJson) as StudentRecord);
+    if (!records.length) {
+      try { records = JSON.parse(batch.payload_json ?? '[]') as StudentRecord[]; } catch { return failure(res, 'invalid_batch_payload', 'Validated import payload could not be restored. Validate the CSV again.', 409); }
+    }
+    if (!records.length) return failure(res, 'empty_import', 'No valid CSV rows are available to commit.', 422);
     const commit = database.db.transaction(() => { for (const record of records) upsertRecord(database, record, req.params.batchId); database.db.prepare('UPDATE import_batches SET status = ?, imported_at = ? WHERE id = ?').run('committed', new Date().toISOString(), req.params.batchId); });
     commit();
     refreshSnapshots(database);
