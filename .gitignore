@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-client/
+public/
 dist-server/
 .vite/
 coverage/

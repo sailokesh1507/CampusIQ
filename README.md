@@ -95,7 +95,7 @@ The unified CSV requires `student_id`, `observed_at` and at least one measurable
 
 ## Deployment
 
-The recommended deployment shape is one Node service because the Express server serves the built Vite client. See [`docs/deployment.md`](docs/deployment.md), `Dockerfile`, and `render.yaml`. Configure:
+The recommended deployment shape is one Node service because the Express server serves the built Vite client. The repository also includes `vercel.json` and `src/index.ts` for a Vercel deployment. See [`docs/deployment.md`](docs/deployment.md), `Dockerfile`, and `render.yaml`. Configure:
 
 - `NODE_ENV=production`
 - `PORT` supplied by the host

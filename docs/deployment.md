@@ -1,8 +1,21 @@
 # Deployment guide
 
+## Vercel deployment
+
+Vercel can detect the exported Express application in `src/index.ts` and the Vite build in `public/`. Deploy from the repository with:
+
+```text
+npx vercel@latest login
+npx vercel@latest --prod
+```
+
+The Vercel function uses `/tmp/campusiq.db` when `DATABASE_PATH` is not configured. This makes the synthetic demo and intervention workflow usable, but writes are not guaranteed across cold starts or redeploys. Configure a managed database or use the Render/persistent-disk arrangement before claiming durable production persistence.
+
+After deployment, verify the returned URL at `/healthz`, `/`, `/api/dashboard`, `/api/students/SYN-007`, and the intervention workflow.
+
 ## Single-service deployment
 
-The API serves `dist-client` in production. Build and start commands are:
+The API serves `public` in production. Build and start commands are:
 
 ```text
 npm ci

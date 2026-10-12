@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "public",
+  "framework": null,
+  "functions": {
+    "src/index.ts": {
+      "runtime": "nodejs22.x",
+      "maxDuration": 30
+    }
+  }
+}

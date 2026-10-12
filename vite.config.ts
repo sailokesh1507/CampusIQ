@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  // Vercel serves the built client from its public asset directory. The same
+  // directory is served by Express for the Docker/Render deployment.
+  publicDir: false,
   server: {
     port: 5173,
     proxy: {
@@ -11,6 +14,6 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: 'dist-client',
+    outDir: 'public',
   },
 });

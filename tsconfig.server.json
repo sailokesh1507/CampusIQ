@@ -9,5 +9,5 @@
     "sourceMap": true,
     "types": ["node"]
   },
-  "include": ["src/server", "src/db", "src/shared", "src/analytics", "src/import"]
+  "include": ["src/index.ts", "src/server", "src/db", "src/shared", "src/analytics", "src/import"]
 }
