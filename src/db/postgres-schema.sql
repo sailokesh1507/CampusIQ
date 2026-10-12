@@ -2,8 +2,15 @@
 -- Apply with: npm run db:migrate:postgres
 -- This schema is intentionally separate from the SQLite demo schema.
 
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- The fixed demo UUID keeps the local synthetic bootstrap compatible with the
+-- production schema. Real institutions receive their own UUID.
+
+-- demo-institution = 00000000-0000-0000-0000-000000000001
+
 CREATE TABLE IF NOT EXISTS institutions (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
   active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -12,7 +19,7 @@ CREATE TABLE IF NOT EXISTS institutions (
 );
 
 CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
   email TEXT NOT NULL UNIQUE,
   display_name TEXT NOT NULL,
@@ -25,7 +32,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   token_hash TEXT NOT NULL UNIQUE,
   expires_at TIMESTAMPTZ NOT NULL,
@@ -34,7 +41,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 
 CREATE TABLE IF NOT EXISTS departments (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
   code TEXT NOT NULL,
   name TEXT NOT NULL,
@@ -45,7 +52,7 @@ CREATE TABLE IF NOT EXISTS departments (
 );
 
 CREATE TABLE IF NOT EXISTS programmes (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
   department_id UUID NOT NULL REFERENCES departments(id) ON DELETE RESTRICT,
   code TEXT NOT NULL,
@@ -57,11 +64,13 @@ CREATE TABLE IF NOT EXISTS programmes (
 );
 
 CREATE TABLE IF NOT EXISTS students (
-  id UUID PRIMARY KEY,
-  institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  institution_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001' REFERENCES institutions(id) ON DELETE CASCADE,
   student_id TEXT NOT NULL,
   display_name TEXT NOT NULL,
   email TEXT,
+  department TEXT NOT NULL DEFAULT '',
+  programme TEXT NOT NULL DEFAULT '',
   department_id UUID REFERENCES departments(id) ON DELETE SET NULL,
   programme_id UUID REFERENCES programmes(id) ON DELETE SET NULL,
   semester INTEGER CHECK (semester BETWEEN 1 AND 12),
@@ -72,7 +81,7 @@ CREATE TABLE IF NOT EXISTS students (
 );
 
 CREATE TABLE IF NOT EXISTS academic_metrics (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
   student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
   observed_at TIMESTAMPTZ NOT NULL,
@@ -85,7 +94,7 @@ CREATE TABLE IF NOT EXISTS academic_metrics (
 );
 
 CREATE TABLE IF NOT EXISTS attendance_metrics (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
   student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
   observed_at TIMESTAMPTZ NOT NULL,
@@ -95,7 +104,7 @@ CREATE TABLE IF NOT EXISTS attendance_metrics (
 );
 
 CREATE TABLE IF NOT EXISTS subject_metrics (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
   student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
   observed_at TIMESTAMPTZ NOT NULL,
@@ -107,7 +116,7 @@ CREATE TABLE IF NOT EXISTS subject_metrics (
 );
 
 CREATE TABLE IF NOT EXISTS lms_metrics (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
   student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
   observed_at TIMESTAMPTZ NOT NULL,
@@ -118,7 +127,7 @@ CREATE TABLE IF NOT EXISTS lms_metrics (
 );
 
 CREATE TABLE IF NOT EXISTS engagement_metrics (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
   student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
   observed_at TIMESTAMPTZ NOT NULL,
@@ -131,7 +140,7 @@ CREATE TABLE IF NOT EXISTS engagement_metrics (
 );
 
 CREATE TABLE IF NOT EXISTS placement_metrics (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
   student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
   observed_at TIMESTAMPTZ NOT NULL,
@@ -143,7 +152,7 @@ CREATE TABLE IF NOT EXISTS placement_metrics (
 );
 
 CREATE TABLE IF NOT EXISTS skills_metrics (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
   student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
   observed_at TIMESTAMPTZ NOT NULL,
@@ -154,7 +163,7 @@ CREATE TABLE IF NOT EXISTS skills_metrics (
 );
 
 CREATE TABLE IF NOT EXISTS feedback (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
   student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
   observed_at TIMESTAMPTZ NOT NULL,
@@ -165,7 +174,7 @@ CREATE TABLE IF NOT EXISTS feedback (
 );
 
 CREATE TABLE IF NOT EXISTS score_snapshots (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
   student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
   calculated_at TIMESTAMPTZ NOT NULL,
@@ -177,8 +186,8 @@ CREATE TABLE IF NOT EXISTS score_snapshots (
 );
 
 CREATE TABLE IF NOT EXISTS interventions (
-  id UUID PRIMARY KEY,
-  institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  institution_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001' REFERENCES institutions(id) ON DELETE CASCADE,
   student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
   score_snapshot_id UUID REFERENCES score_snapshots(id) ON DELETE SET NULL,
   category TEXT NOT NULL CHECK (category IN ('academic', 'attendance', 'learning', 'placement', 'wellbeing_referral', 'other')),
@@ -194,7 +203,7 @@ CREATE TABLE IF NOT EXISTS interventions (
 );
 
 CREATE TABLE IF NOT EXISTS intervention_notes (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
   intervention_id UUID NOT NULL REFERENCES interventions(id) ON DELETE CASCADE,
   body TEXT NOT NULL,
@@ -203,8 +212,8 @@ CREATE TABLE IF NOT EXISTS intervention_notes (
 );
 
 CREATE TABLE IF NOT EXISTS import_batches (
-  id UUID PRIMARY KEY,
-  institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  institution_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001' REFERENCES institutions(id) ON DELETE CASCADE,
   source_type TEXT NOT NULL,
   filename TEXT NOT NULL,
   mode TEXT NOT NULL CHECK (mode IN ('atomic', 'partial')),
@@ -216,7 +225,8 @@ CREATE TABLE IF NOT EXISTS import_batches (
   initiated_by_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
   payload_json JSONB,
   blocking_header_errors BOOLEAN NOT NULL DEFAULT FALSE,
-  imported_at TIMESTAMPTZ
+  imported_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS import_errors (
@@ -237,7 +247,7 @@ CREATE TABLE IF NOT EXISTS import_staged_records (
 );
 
 CREATE TABLE IF NOT EXISTS audit_logs (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
   user_id UUID REFERENCES users(id) ON DELETE SET NULL,
   action TEXT NOT NULL,

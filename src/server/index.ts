@@ -1,11 +1,12 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createApp } from './app.js';
+import { createConfiguredApp } from './configured-app.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isProduction = process.env.NODE_ENV === 'production';
-const app = createApp({
+const app = createConfiguredApp({
   databasePath: process.env.DATABASE_PATH ?? './data/campusiq.db',
+  databaseUrl: process.env.DATABASE_URL,
   staticPath: isProduction ? path.resolve(__dirname, '../../public') : undefined,
 });
 

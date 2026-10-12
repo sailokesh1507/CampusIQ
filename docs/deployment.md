@@ -13,7 +13,7 @@ npx vercel@latest --prod
 
 Once the project is linked with `npx vercel@latest link --yes --project campusiq`, the repository shortcut is `npm run deploy:vercel`. After deployment, `npm run smoke:live` checks the health endpoint, dashboard, seeded profile, methodology endpoint, and CSV template.
 
-The Vercel function uses `/tmp/campusiq.db` when `DATABASE_PATH` is not configured. This makes the synthetic demo and intervention workflow usable, but writes are not guaranteed across cold starts or redeploys. Configure a managed database or use the Render/persistent-disk arrangement before claiming durable production persistence. Import previews are staged in SQLite rather than process memory, so validation and commit do not depend on a single warm function instance; durable cross-instance behavior still requires shared storage.
+The Vercel function uses `/tmp/campusiq.db` when `DATABASE_DRIVER` is not set or is `sqlite`. This keeps the public synthetic demo usable, but writes are not guaranteed across cold starts or redeploys. For durable operation, set `DATABASE_DRIVER=postgres`, `DATABASE_URL`, `DATABASE_SSL=true`, `DEMO_MODE=false`, and `AUTH_REQUIRED=true` after provisioning the first institution administrator. The Postgres import, intervention, catalog, auth and audit paths are implemented behind the same route surface.
 
 The native `better-sqlite3` binary is explicitly included in the function bundle by `vercel.json`. If a Vercel build reports a native-module compatibility error, use the Render/Docker path documented below, or move the database to a managed service compatible with the repository interface.
 
@@ -31,9 +31,9 @@ npm start
 
 Health check: `GET /healthz`.
 
-Set `NODE_ENV=production`, the host-provided `PORT`, `DATABASE_PATH`, and `APP_BASE_URL`. Keep `VITE_API_URL` blank for the single-service arrangement so the browser uses same-origin `/api` calls. No credentials are needed for the deterministic product path.
+Set `NODE_ENV=production`, the host-provided `PORT`, `DATABASE_DRIVER`, `DATABASE_URL`, `DATABASE_SSL`, and `APP_BASE_URL`. Keep `VITE_API_URL` blank for the single-service arrangement so the browser uses same-origin `/api` calls. `DATABASE_URL` must be configured as a secret environment variable.
 
-For the current synthetic demo, leave `DEMO_MODE=true` and `AUTH_REQUIRED=false`. For an institution deployment, do not point real data at Vercel's ephemeral `/tmp/campusiq.db`; provision managed Postgres, create the first admin user through a controlled process, set `DEMO_MODE=false`, and set `AUTH_REQUIRED=true`. The repository now includes the auth/session/catalog foundation, but durable Postgres provisioning and enterprise identity integration remain the next backend milestone.
+For the current synthetic demo, leave `DEMO_MODE=true` and `AUTH_REQUIRED=false`. For an institution deployment, do not point real data at Vercel's ephemeral `/tmp/campusiq.db`; provision managed Postgres, create the first admin user through a controlled process, set `DATABASE_DRIVER=postgres`, `DEMO_MODE=false`, and `AUTH_REQUIRED=true`. `POSTGRES_SEED_DEMO=true` is reserved for an isolated synthetic workspace and must remain false for institution data.
 
 The production schema is prepared in `src/db/postgres-schema.sql`. Apply it with:
 
@@ -41,7 +41,7 @@ The production schema is prepared in `src/db/postgres-schema.sql`. Apply it with
 DATABASE_URL=postgres-connection-string npm run db:migrate:postgres
 ```
 
-The current application remains on the SQLite demo adapter until the Postgres repository adapter is enabled and verified. This prevents an unconfigured production database from breaking the public synthetic demo.
+The public Vercel demo remains on SQLite until the managed connection and institution data are intentionally configured. The application selects the adapter from `DATABASE_DRIVER`, so an unconfigured Postgres connection cannot silently fall back to ephemeral SQLite.
 
 ## Render-style setup
 

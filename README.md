@@ -16,7 +16,7 @@ The repository contains a React/Vite client and an Express/TypeScript API in one
 - Seven data domains: academic (including optional subject performance), attendance (including optional subject-wise attendance), LMS, engagement, placement, skills and feedback.
 - Unified CSV template, validation preview, row-level errors, atomic/partial commit modes and import history.
 - Persistent SQLite interventions with category, rationale, owner, due date, status and history notes.
-- Authentication foundation with demo/production mode, password hashing, HttpOnly sessions, user roles and institution catalog APIs.
+- Authentication foundation with demo/production mode, password hashing, HttpOnly sessions, user roles and institution catalog APIs on both SQLite and managed Postgres adapters.
 - Methodology page documenting `heuristic-v1`, weights, coverage rules, exclusions and limitations.
 - Vitest scoring/import/API coverage and production client/server builds.
 
@@ -60,7 +60,7 @@ The repository is intentionally a single application with clear boundaries:
 | --- | --- |
 | `src/client` | React UI, API client, styles |
 | `src/server` | Express routes and repository orchestration |
-| `src/db` | SQLite connection, schema creation, synthetic seed |
+| `src/db` | SQLite connection, managed Postgres pool/schema, synthetic seed |
 | `src/analytics` | Pure scoring, normalization and segmentation |
 | `src/import` | CSV parsing, validation and templates |
 | `src/shared` | Shared TypeScript contracts and methodology metadata |
@@ -70,16 +70,16 @@ The repository is intentionally a single application with clear boundaries:
 
 `public/`, `dist-server/`, and `dist-client/` are generated build output and are ignored by Git. `data/campusiq.db` is local synthetic runtime state, `node_modules/` contains installed dependencies, and `.vercel/` contains the local deployment link; none are source files.
 
-The first server start creates `data/campusiq.db` and idempotently seeds the synthetic dataset. To use another database location, set `DATABASE_PATH`. SQLite files are ignored by Git.
+With the default `DATABASE_DRIVER=sqlite`, the first server start creates `data/campusiq.db` and idempotently seeds the synthetic dataset. Set `DATABASE_PATH` to use another SQLite location. Set `DATABASE_DRIVER=postgres` with `DATABASE_URL` to use the managed Postgres adapter instead. SQLite files are ignored by Git.
 
 ### Demo and production modes
 
 The backend now has an explicit operating-mode boundary:
 
-- `DEMO_MODE=true` (default locally) seeds the synthetic demonstration institution and a demo administrator account.
+- `DEMO_MODE=true` (default locally) describes the synthetic demonstration mode. SQLite seeds it automatically; Postgres seeding is explicit through `POSTGRES_SEED_DEMO=true` so a production database cannot be populated accidentally.
 - `DEMO_MODE=false` prevents synthetic student seeding. A managed database and an explicit user-provisioning workflow are required before enabling this in a real institution.
 - `AUTH_REQUIRED=false` preserves the public hackathon demo flow.
-- `AUTH_REQUIRED=true` protects the API and activates the faculty login screen. The current auth foundation uses signed-by-storage, opaque HttpOnly sessions and Node `scrypt` password hashes; the next production step is moving these tables from SQLite to managed Postgres.
+- `AUTH_REQUIRED=true` protects the API and activates the faculty login screen. The auth foundation uses opaque HttpOnly sessions, institution-scoped roles and Node `scrypt` password hashes on either database driver.
 
 Demo credentials are controlled by `DEMO_ADMIN_EMAIL` and `DEMO_ADMIN_PASSWORD`; never reuse them for a real institution.
 
@@ -89,6 +89,17 @@ Production-style local run:
 npm run build
 $env:NODE_ENV='production'
 $env:PORT='3001'
+npm start
+```
+
+Managed Postgres run:
+
+```powershell
+$env:DATABASE_DRIVER='postgres'
+$env:DATABASE_URL='postgres-connection-string'
+$env:DATABASE_SSL='true'
+$env:DEMO_MODE='false'
+$env:AUTH_REQUIRED='true'
 npm start
 ```
 
@@ -160,7 +171,10 @@ The live production deployment is verified at `/`, `/healthz`, `/api/dashboard`,
 - `NODE_ENV=production`
 - `PORT` supplied by the host
 - `DATABASE_PATH` on a persistent disk if intervention writes must survive restarts
-- `DATABASE_URL` for the managed Postgres migration path
+- `DATABASE_DRIVER=postgres` to enable the managed Postgres adapter
+- `DATABASE_URL` for the managed Postgres connection
+- `DATABASE_SSL=true` for the managed connection pool
+- `POSTGRES_SEED_DEMO=true` only for an isolated synthetic Postgres workspace
 - `APP_BASE_URL` for documentation/host metadata
 
 No AI provider or secret is required. The optional AI variables are intentionally absent from the frontend and are not needed by the product path. If the selected host does not guarantee persistent disk storage, present this as a seeded synthetic demo and do not claim cross-redeploy persistence.
@@ -176,4 +190,4 @@ No AI provider or secret is required. The optional AI variables are intentionall
 
 ## Scope and privacy
 
-This prototype intentionally excludes authentication/SSO, production SIS/LMS connectors, notifications, biometric data, automated adverse decisions, and retrained predictive ML. Do not load real student information into the demo. Faculty retain judgment at every decision point.
+This prototype intentionally excludes enterprise SSO, production SIS/LMS connectors, notifications, biometric data, automated adverse decisions, and retrained predictive ML. Do not load real student information into the public demo. Faculty retain judgment at every decision point.

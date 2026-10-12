@@ -16,6 +16,15 @@ await client.connect();
 try {
   await client.query('BEGIN');
   await client.query(schema);
+  for (const table of ['institutions', 'users', 'sessions', 'departments', 'programmes', 'students', 'academic_metrics', 'attendance_metrics', 'subject_metrics', 'lms_metrics', 'engagement_metrics', 'placement_metrics', 'skills_metrics', 'feedback', 'score_snapshots', 'interventions', 'intervention_notes', 'import_batches', 'audit_logs']) {
+    await client.query(`ALTER TABLE ${table} ALTER COLUMN id SET DEFAULT gen_random_uuid()`);
+  }
+  await client.query("ALTER TABLE students ADD COLUMN IF NOT EXISTS department TEXT NOT NULL DEFAULT ''");
+  await client.query("ALTER TABLE students ADD COLUMN IF NOT EXISTS programme TEXT NOT NULL DEFAULT ''");
+  await client.query("ALTER TABLE students ALTER COLUMN institution_id SET DEFAULT '00000000-0000-0000-0000-000000000001'");
+  await client.query("ALTER TABLE interventions ALTER COLUMN institution_id SET DEFAULT '00000000-0000-0000-0000-000000000001'");
+  await client.query("ALTER TABLE import_batches ALTER COLUMN institution_id SET DEFAULT '00000000-0000-0000-0000-000000000001'");
+  await client.query("ALTER TABLE import_batches ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()");
   await client.query('COMMIT');
   console.log('CampusIQ Postgres schema applied successfully.');
 } catch (error) {
