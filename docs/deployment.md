@@ -11,6 +11,8 @@ npx vercel@latest login
 npx vercel@latest --prod
 ```
 
+Once the project is linked with `npx vercel@latest link --yes --project campusiq`, the repository shortcut is `npm run deploy:vercel`. After deployment, `npm run smoke:live` checks the health endpoint, dashboard, seeded profile, methodology endpoint, and CSV template.
+
 The Vercel function uses `/tmp/campusiq.db` when `DATABASE_PATH` is not configured. This makes the synthetic demo and intervention workflow usable, but writes are not guaranteed across cold starts or redeploys. Configure a managed database or use the Render/persistent-disk arrangement before claiming durable production persistence. Import previews are staged in SQLite rather than process memory, so validation and commit do not depend on a single warm function instance; durable cross-instance behavior still requires shared storage.
 
 The native `better-sqlite3` binary is explicitly included in the function bundle by `vercel.json`. If a Vercel build reports a native-module compatibility error, use the Render/Docker path documented below, or move the database to a managed service compatible with the repository interface.

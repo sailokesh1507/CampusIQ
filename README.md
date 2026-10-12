@@ -51,6 +51,24 @@ npm run dev
 - API: <http://localhost:3001>
 - Health: <http://localhost:3001/healthz>
 
+## Repository map and workflow
+
+The repository is intentionally a single application with clear boundaries:
+
+| Location | Responsibility |
+| --- | --- |
+| `src/client` | React UI, API client, styles |
+| `src/server` | Express routes and repository orchestration |
+| `src/db` | SQLite connection, schema creation, synthetic seed |
+| `src/analytics` | Pure scoring, normalization and segmentation |
+| `src/import` | CSV parsing, validation and templates |
+| `src/shared` | Shared TypeScript contracts and methodology metadata |
+| `api/index.ts` | Vercel adapter for `/healthz` and `/api/*` |
+| `docs` | Architecture, methodology, deployment and demo materials |
+| `tests` | Scoring, import and API integration tests |
+
+`public/`, `dist-server/`, and `dist-client/` are generated build output and are ignored by Git. `data/campusiq.db` is local synthetic runtime state, `node_modules/` contains installed dependencies, and `.vercel/` contains the local deployment link; none are source files.
+
 The first server start creates `data/campusiq.db` and idempotently seeds the synthetic dataset. To use another database location, set `DATABASE_PATH`. SQLite files are ignored by Git.
 
 Production-style local run:
@@ -69,6 +87,25 @@ npm ci
 npm run typecheck
 npm test
 npm run build
+```
+
+The shortest complete local check is:
+
+```powershell
+npm run verify
+```
+
+Useful release commands:
+
+```powershell
+npm run smoke:live
+npm run deploy:vercel
+```
+
+To remove reproducible build output without touching source, dependencies, the local database, or the Vercel link:
+
+```powershell
+npm run clean
 ```
 
 The API integration tests start an in-memory SQLite instance, verify seeded dashboard/profile responses, validate and commit a CSV row, and exercise intervention create/status/note persistence. Browser automation is not required for the core test suite.
