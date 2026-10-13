@@ -182,3 +182,5 @@ h1, h2, h3, h4, strong { font-family: 'Space Grotesk', 'DM Sans', sans-serif; }
 .component-top { font-size: 12px; }
 .component-meta, .component-details, .missing-box ul { font-size: 11px; }
 .component-details summary, .missing-box summary { font-size: 11px; }
+.top-auth-button { min-height: 32px; padding: 7px 10px; font-size: 10px; }
+.auth-topbar-actions { display: flex; align-items: center; gap: 14px; }

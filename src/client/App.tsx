@@ -44,6 +44,7 @@ export default function App() {
   const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
 
   useEffect(() => { const timer = setTimeout(() => setSearch(filters.q), 250); return () => clearTimeout(timer); }, [filters.q]);
   useEffect(() => {
@@ -86,10 +87,11 @@ export default function App() {
   const showSignal = (signal: Signal) => { setFilters((current) => ({ ...current, signal })); navigate('students'); };
   const currentPage = navigation.find((item) => item.key === page)!;
   const cohortPage = ['overview', 'students', 'segments'].includes(page);
-  const signOut = async () => { await api('/api/auth/logout', { method: 'POST' }).catch(() => undefined); setAuthUser(null); };
+  const authenticate = (user: AuthUser) => { setAuthUser(user); setShowAuth(false); setRefreshKey((value) => value + 1); };
+  const signOut = async () => { await api('/api/auth/logout', { method: 'POST' }).catch(() => undefined); setAuthUser(null); setShowAuth(false); setRefreshKey((value) => value + 1); };
 
   if (!authReady) return <div className="auth-loading"><span className="spinner" /></div>;
-  if (authConfig?.required && !authUser) return <AuthScreen config={authConfig} onAuthenticated={setAuthUser} />;
+  if ((authConfig?.required && !authUser) || (showAuth && !authUser)) return <AuthScreen config={authConfig!} onAuthenticated={authenticate} onDemoMode={() => setShowAuth(false)} />;
 
   return <div className="app-shell">
     <a className="skip-link" href="#main-content">Skip to content</a>
@@ -104,11 +106,11 @@ export default function App() {
     </aside>
     <div className="workspace-main">
       <header className="topbar"><div className="topbar-breadcrumb"><button className="icon-button menu-button" aria-label="Toggle navigation" aria-expanded={mobileNav} aria-controls="workspace-navigation" onClick={() => setMobileNav(!mobileNav)}><Icon name="menu" /></button><span>Workspace</span><Icon name="chevron" size={13} /><strong>{currentPage.label}</strong></div>
-        <div className="top-actions"><span className="today"><Icon name="calendar" size={15} />{new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span><ThemeToggle /><span className="topbar-divider" /><span className="avatar small">FA</span></div>
+         <div className="top-actions"><span className="today"><Icon name="calendar" size={15} />{new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>{authUser ? <button className="secondary top-auth-button" onClick={signOut}><Icon name="arrow" size={15} />Return to demo</button> : <button className="secondary top-auth-button" onClick={() => setShowAuth(true)}><Icon name="shield" size={15} />Faculty sign in</button>}<ThemeToggle /><span className="topbar-divider" /><span className="avatar small">{authUser ? initials(authUser.displayName) : 'FA'}</span></div>
       </header>
       <main id="main-content" className="main-content" tabIndex={-1}>
         <div className="page-header"><div><div className="eyebrow">YOUR STUDENT SUCCESS WORKSPACE</div><h1>{currentPage.label}<span className="heading-dot">.</span></h1><p>{currentPage.description}</p></div><div className="page-header-actions"><button className="icon-button refresh-button" aria-label="Refresh data" disabled={loading} onClick={() => setRefreshKey((value) => value + 1)}><Icon name="refresh" size={18} className={loading ? 'spinning' : ''} /></button>{page !== 'imports' && <button className="primary" onClick={() => navigate('imports')}><Icon name="plus" size={17} />Import data</button>}</div></div>
-        <div className="demo-banner"><span><span className="status-dot" />{authConfig?.demoMode ? 'Synthetic demo data' : 'Production workspace'}</span><span>Heuristic decision support<Icon name="info" size={13} /></span></div>
+         <div className="demo-banner"><span><span className="status-dot" />{authUser ? 'Institution workspace' : 'Synthetic demo data'}</span><span>Heuristic decision support<Icon name="info" size={13} /></span></div>
         {error && <ErrorBanner message={error} retry={() => setRefreshKey((value) => value + 1)} />}
         {cohortPage && <FilterBar filters={filters} onChange={(key, value) => setFilters((current) => ({ ...current, [key]: value }))} onReset={() => setFilters({ ...EMPTY_FILTERS })} cohort={cohort} loading={loading} />}
         <div className="page-transition" key={page} aria-busy={cohortPage && loading}>
