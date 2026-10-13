@@ -18,32 +18,37 @@ async function readJson(response) {
 }
 
 async function main() {
+  const demoLogin = await fetch(`${base}/api/auth/demo`, { method: 'POST' });
+  if (!demoLogin.ok) throw new Error(`Demo login failed with HTTP ${demoLogin.status}`);
+  const cookie = demoLogin.headers.get('set-cookie')?.split(';', 1)[0];
+  if (!cookie) throw new Error('Demo login did not set a session cookie.');
+  const headers = { cookie };
   const created = await readJson(await fetch(`${base}/api/interventions`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { ...headers, 'content-type': 'application/json' },
     body: JSON.stringify({ studentId: 'SYN-007', category: 'placement', title: 'Live smoke follow-up', rationale: 'Temporary release verification record.', owner: 'Release Check', dueDate: '2026-02-20' }),
   }));
   interventionId = created.data.id;
   const updated = await readJson(await fetch(`${base}/api/interventions/${interventionId}`, {
     method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
+    headers: { ...headers, 'content-type': 'application/json' },
     body: JSON.stringify({ status: 'in_progress' }),
   }));
   if (updated.data.status !== 'in_progress') throw new Error('Live intervention status did not persist.');
   await readJson(await fetch(`${base}/api/interventions/${interventionId}/notes`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { ...headers, 'content-type': 'application/json' },
     body: JSON.stringify({ body: 'Temporary live smoke note.' }),
   }));
 
   const form = new FormData();
   form.append('mode', 'partial');
   form.append('file', new Blob([`student_id,display_name,observed_at,marks_percent\n${studentId},Live Smoke Student,2026-01-15T00:00:00.000Z,71\n`], { type: 'text/csv' }), 'live-smoke.csv');
-  const validation = await readJson(await fetch(`${base}/api/imports/validate`, { method: 'POST', body: form }));
+  const validation = await readJson(await fetch(`${base}/api/imports/validate`, { method: 'POST', headers, body: form }));
   batchId = validation.data.batchId;
-  const committed = await readJson(await fetch(`${base}/api/imports/${batchId}/commit`, { method: 'POST' }));
+  const committed = await readJson(await fetch(`${base}/api/imports/${batchId}/commit`, { method: 'POST', headers }));
   if (committed.data.status !== 'committed') throw new Error('Live import did not commit.');
-  const profile = await readJson(await fetch(`${base}/api/students/${studentId}`));
+  const profile = await readJson(await fetch(`${base}/api/students/${studentId}`, { headers }));
   if (profile.data.record.studentId !== studentId) throw new Error('Live imported profile was not readable.');
   console.log(JSON.stringify({ status: 'ok', live: base, intervention: 'persisted', import: 'committed', cleanup: 'pending' }));
 }

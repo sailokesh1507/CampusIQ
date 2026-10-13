@@ -36,6 +36,6 @@ flowchart LR
 
 ## Production boundary
 
-The public demo currently runs on SQLite so a fresh clone is easy to evaluate. `DATABASE_DRIVER` selects the storage backend, `POSTGRES_SEED_DEMO` controls explicit synthetic Postgres bootstrap, and `AUTH_REQUIRED` controls whether API routes require a faculty session. Authentication, institution catalog, membership and audit tables are available on both schemas. Before real student data is used, provision users through a controlled admin flow, set `DATABASE_DRIVER=postgres`, keep `POSTGRES_SEED_DEMO=false`, and enable `AUTH_REQUIRED=true`.
+The local demo defaults to SQLite so a fresh clone is easy to evaluate. The hosted release uses managed Postgres, `DATABASE_DRIVER` selects the storage backend, `POSTGRES_SEED_DEMO` controls explicit synthetic bootstrap, and `AUTH_REQUIRED` controls whether API routes require a faculty session. Authentication, institution catalog, membership and audit tables are available on both schemas. In hosted production mode, the fictional demo institution is accessed through a protected demo session, while provisioned institutional users are scoped to their assigned institution.
 
 The validated import payload is staged in the selected database with immutable batch metadata/errors, so a restart or another Node process can complete a preview on the same persistent database. Vercel's default `/tmp` SQLite database remains ephemeral; use managed Postgres for durable imports and interventions.

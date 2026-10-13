@@ -1,5 +1,18 @@
 const base = (process.argv[2] || process.env.APP_BASE_URL || 'http://localhost:3001').replace(/\/$/, '');
 
+const authConfigResponse = await fetch(`${base}/api/auth/config`);
+const authConfig = await authConfigResponse.json();
+if (!authConfigResponse.ok) throw new Error(`/api/auth/config failed with HTTP ${authConfigResponse.status}`);
+let headers = {};
+if (authConfig.data?.required) {
+  const demoResponse = await fetch(`${base}/api/auth/demo`, { method: 'POST' });
+  const demoBody = await demoResponse.json();
+  if (!demoResponse.ok) throw new Error(`/api/auth/demo failed with HTTP ${demoResponse.status}`);
+  const cookie = demoResponse.headers.get('set-cookie')?.split(';', 1)[0];
+  if (!cookie) throw new Error('Demo authentication did not set a session cookie.');
+  headers = { cookie };
+}
+
 const checks = [
   { path: '/healthz', kind: 'json', verify: (body) => body.data?.status === 'ok' },
   { path: '/api/dashboard', kind: 'json', verify: (body) => body.data?.kpis?.totalStudents >= 1 },
@@ -10,7 +23,7 @@ const checks = [
 
 for (const check of checks) {
   const url = `${base}${check.path}`;
-  const response = await fetch(url);
+   const response = await fetch(url, { headers });
   const body = check.kind === 'json' ? await response.json() : await response.text();
   if (!response.ok || !check.verify(body)) {
     throw new Error(`${check.path} failed with HTTP ${response.status}`);

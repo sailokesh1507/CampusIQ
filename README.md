@@ -173,6 +173,7 @@ All JSON API responses use `{ data }`; failures use `{ error: { code, message, f
 | `GET /api/methodology` | Published score version, formula and guardrails |
 | `GET /api/auth/config` | Auth mode and demo-mode metadata |
 | `GET /api/auth/me` | Current authenticated faculty session |
+| `POST /api/auth/demo` | Create a protected session for the fictional demo institution |
 | `POST /api/auth/login` / `POST /api/auth/logout` | Faculty session lifecycle |
 | `GET /api/catalog` | Institution departments and programmes |
 | `POST /api/catalog/departments` / `POST /api/catalog/programmes` | Admin/coordinator catalog management |

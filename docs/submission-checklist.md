@@ -9,7 +9,8 @@
 - [x] Intervention status/note persistence is covered by API integration tests.
 - [x] `/healthz`, `Dockerfile`, `render.yaml`, `.env.example` and deployment limitations are documented.
 - [x] Hosted URL provisioned and smoke-tested: https://campusiq-eight.vercel.app
-- [x] Authentication/session/catalog foundation is covered by API integration tests while demo mode remains safe for judges.
+- [x] Hosted production mode requires authentication while the fictional demo institution remains available through protected demo access.
 - [x] Complete final hosted smoke test and live Postgres write-path rehearsal.
 - [x] Fictional presentation CSV validates cleanly and is loaded into the hosted demo without real student PII.
+- [x] Production login, protected demo workspace access, and demo credentials are ready for judges.
 - [ ] Complete demo rehearsal and submission form.

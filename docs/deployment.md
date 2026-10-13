@@ -58,4 +58,4 @@ The hosted release selects the adapter from `DATABASE_DRIVER`, so an unconfigure
 5. Create or update an intervention, reload, and confirm persistence for the host’s storage model.
 6. Download `/api/import/templates/unified`, validate a synthetic row, and review error output.
 
-Do not deploy real student data or API keys. The hosted demo is a decision-support prototype; it has no authentication, institutional connector, notification, or validated predictive model.
+Do not deploy real student data or API keys. The hosted production demo is a decision-support prototype with session authentication, fictional demo data, no institutional connector, no notifications, and no validated predictive model.
