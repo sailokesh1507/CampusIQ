@@ -9,7 +9,7 @@ import { getSegments, SEGMENT_DEFINITIONS } from '../analytics/segments.js';
 import { METHODOLOGY } from '../shared/methodology.js';
 import type { DashboardData, Intervention, StudentRecord, StudentSummary } from '../shared/types.js';
 import { authConfig, currentSessionToken } from '../auth/auth.js';
-import { createPostgresSession, findPostgresUser, logoutPostgres, postgresAuthMiddleware, requirePostgresRole, setSessionCookie, clearSessionCookie, verifyPassword } from '../auth/postgres-auth.js';
+import { createPostgresDemoSession, createPostgresSession, findPostgresUser, logoutPostgres, postgresAuthMiddleware, requirePostgresRole, setSessionCookie, clearSessionCookie, verifyPassword } from '../auth/postgres-auth.js';
 import { auditPostgres } from './postgres-audit.js';
 import { PostgresDatabase, PG_DEMO_INSTITUTION_ID, upsertPostgresRecord } from '../db/postgres.js';
 import { unifiedTemplate } from '../import/templates.js';
@@ -74,6 +74,13 @@ export function createPostgresApp(options: AppOptions): Express {
     const parsed = z.object({ email: z.string().trim().email(), password: z.string().min(1) }).safeParse(req.body); if (!parsed.success) return failure(res, 'invalid_credentials', 'Enter a valid email and password.', 401);
     const user = await findPostgresUser(database, parsed.data.email); if (!user || !verifyPassword(parsed.data.password, user.passwordHash)) return failure(res, 'invalid_credentials', 'The email or password is not correct.', 401);
     const session = await createPostgresSession(database, user.id); await database.pool.query('UPDATE users SET last_login_at=NOW(), updated_at=NOW() WHERE id=$1', [user.id]); setSessionCookie(res, session.token, session.expiresAt); const publicUser = { id: user.id, email: user.email, displayName: user.displayName, role: user.role, institutionId: user.institutionId, institutionName: user.institutionName }; await auditPostgres(database, req, 'auth.login', 'user', user.id, { email: user.email }, { institutionId: user.institutionId, userId: user.id }); return response(res, { user: publicUser, expiresAt: session.expiresAt });
+  } catch (error) { next(error); } });
+  app.post('/api/auth/demo', async (req, res, next) => { try {
+    const session = await createPostgresDemoSession(database);
+    if (!session) return failure(res, 'demo_access_unavailable', 'The fictional demo workspace is not available.', 503);
+    setSessionCookie(res, session.token, session.expiresAt);
+    await auditPostgres(database, req, 'auth.demo_login', 'user', session.user.id, {}, { institutionId: session.user.institutionId, userId: session.user.id });
+    return response(res, { user: session.user, expiresAt: session.expiresAt });
   } catch (error) { next(error); } });
   app.post('/api/auth/logout', async (req, res, next) => { try { await logoutPostgres(database, currentSessionToken(req)); clearSessionCookie(res); return response(res, { loggedOut: true }); } catch (error) { next(error); } });
 

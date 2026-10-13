@@ -50,7 +50,7 @@ export default function App() {
   useEffect(() => {
     const controller = new AbortController();
     Promise.all([api<AuthConfig>('/api/auth/config', { signal: controller.signal }), api<{ user: AuthUser | null }>('/api/auth/me', { signal: controller.signal })])
-      .then(([config, session]) => { if (controller.signal.aborted) return; setAuthConfig(config); setAuthUser(session.user); }).catch(() => { if (!controller.signal.aborted) setAuthConfig({ required: false, demoMode: true, demoEmail: null }); }).finally(() => { if (!controller.signal.aborted) setAuthReady(true); });
+      .then(([config, session]) => { if (controller.signal.aborted) return; setAuthConfig(config); setAuthUser(session.user); }).catch(() => { if (!controller.signal.aborted) setAuthConfig({ required: false, demoMode: true, demoAccess: true, demoEmail: null }); }).finally(() => { if (!controller.signal.aborted) setAuthReady(true); });
     return () => controller.abort();
   }, []);
   const query = useMemo(() => new URLSearchParams(Object.entries({ ...filters, q: search }).filter(([, value]) => value)).toString(), [filters, search]);
@@ -88,10 +88,15 @@ export default function App() {
   const currentPage = navigation.find((item) => item.key === page)!;
   const cohortPage = ['overview', 'students', 'segments'].includes(page);
   const authenticate = (user: AuthUser) => { setAuthUser(user); setShowAuth(false); setRefreshKey((value) => value + 1); };
+  const enterDemoWorkspace = async () => {
+    if (!authConfig?.required) { setShowAuth(false); return; }
+    const result = await api<{ user: AuthUser }>('/api/auth/demo', { method: 'POST' });
+    authenticate(result.user);
+  };
   const signOut = async () => { await api('/api/auth/logout', { method: 'POST' }).catch(() => undefined); setAuthUser(null); setShowAuth(false); setRefreshKey((value) => value + 1); };
 
   if (!authReady) return <div className="auth-loading"><span className="spinner" /></div>;
-  if ((authConfig?.required && !authUser) || (showAuth && !authUser)) return <AuthScreen config={authConfig!} onAuthenticated={authenticate} onDemoMode={() => setShowAuth(false)} />;
+  if ((authConfig?.required && !authUser) || (showAuth && !authUser)) return <AuthScreen config={authConfig!} onAuthenticated={authenticate} onDemoMode={enterDemoWorkspace} />;
 
   return <div className="app-shell">
     <a className="skip-link" href="#main-content">Skip to content</a>
@@ -106,7 +111,7 @@ export default function App() {
     </aside>
     <div className="workspace-main">
       <header className="topbar"><div className="topbar-breadcrumb"><button className="icon-button menu-button" aria-label="Toggle navigation" aria-expanded={mobileNav} aria-controls="workspace-navigation" onClick={() => setMobileNav(!mobileNav)}><Icon name="menu" /></button><span>Workspace</span><Icon name="chevron" size={13} /><strong>{currentPage.label}</strong></div>
-         <div className="top-actions"><span className="today"><Icon name="calendar" size={15} />{new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>{authUser ? <button className="secondary top-auth-button" onClick={signOut}><Icon name="arrow" size={15} />Return to demo</button> : <button className="secondary top-auth-button" onClick={() => setShowAuth(true)}><Icon name="shield" size={15} />Faculty sign in</button>}<ThemeToggle /><span className="topbar-divider" /><span className="avatar small">{authUser ? initials(authUser.displayName) : 'FA'}</span></div>
+         <div className="top-actions"><span className="today"><Icon name="calendar" size={15} />{new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>{authUser ? <button className="secondary top-auth-button" onClick={signOut}><Icon name="arrow" size={15} />{authConfig?.required ? 'Sign out' : 'Return to demo'}</button> : <button className="secondary top-auth-button" onClick={() => setShowAuth(true)}><Icon name="shield" size={15} />Faculty sign in</button>}<ThemeToggle /><span className="topbar-divider" /><span className="avatar small">{authUser ? initials(authUser.displayName) : 'FA'}</span></div>
       </header>
       <main id="main-content" className="main-content" tabIndex={-1}>
         <div className="page-header"><div><div className="eyebrow">YOUR STUDENT SUCCESS WORKSPACE</div><h1>{currentPage.label}<span className="heading-dot">.</span></h1><p>{currentPage.description}</p></div><div className="page-header-actions"><button className="icon-button refresh-button" aria-label="Refresh data" disabled={loading} onClick={() => setRefreshKey((value) => value + 1)}><Icon name="refresh" size={18} className={loading ? 'spinning' : ''} /></button>{page !== 'imports' && <button className="primary" onClick={() => navigate('imports')}><Icon name="plus" size={17} />Import data</button>}</div></div>

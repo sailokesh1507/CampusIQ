@@ -10,7 +10,7 @@ import { METHODOLOGY } from '../shared/methodology.js';
 import type { DashboardData, Intervention, StudentRecord, StudentSummary } from '../shared/types.js';
 import { Database } from '../db/connection.js';
 import { seedDatabase } from '../db/seed.js';
-import { audit, authConfig, DEMO_INSTITUTION_ID, authMiddleware, clearSessionCookie, createSession, currentSessionToken, findUserByEmail, requireRole, setSessionCookie, verifyPassword, deleteSession } from '../auth/auth.js';
+import { audit, authConfig, DEMO_INSTITUTION_ID, authMiddleware, clearSessionCookie, createSession, currentSessionToken, demoCredentials, findUserByEmail, requireRole, setSessionCookie, verifyPassword, deleteSession } from '../auth/auth.js';
 import { unifiedTemplate } from '../import/templates.js';
 import { validateUnifiedCsv } from '../import/validators.js';
 import { getIntervention, getRecord, getRecords, getSnapshotId, listInterventions, refreshSnapshots, toSummary, upsertRecord } from './repository.js';
@@ -106,6 +106,17 @@ export function createApp(options: AppOptions): Express {
     setSessionCookie(res, session.token, session.expiresAt);
     const user = { id: row.id, email: row.email, displayName: row.display_name, role: row.role, institutionId: row.institution_id, institutionName: row.institution_name };
     audit(database, req, 'auth.login', 'user', row.id, { email: row.email });
+    return response(res, { user, expiresAt: session.expiresAt });
+  });
+  app.post('/api/auth/demo', (req, res) => {
+    if (!authConfig().demoAccess) return failure(res, 'demo_access_unavailable', 'The fictional demo workspace is not available.', 503);
+    const credentials = demoCredentials();
+    const row = findUserByEmail(database, credentials.email);
+    if (!row || !row.active || !verifyPassword(credentials.password, row.password_hash)) return failure(res, 'demo_access_unavailable', 'The fictional demo workspace is not available.', 503);
+    const session = createSession(database, row.id);
+    setSessionCookie(res, session.token, session.expiresAt);
+    const user = { id: row.id, email: row.email, displayName: row.display_name, role: row.role, institutionId: row.institution_id, institutionName: row.institution_name };
+    audit(database, req, 'auth.demo_login', 'user', row.id);
     return response(res, { user, expiresAt: session.expiresAt });
   });
   app.post('/api/auth/logout', (req, res) => {

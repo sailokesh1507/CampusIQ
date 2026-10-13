@@ -20,10 +20,12 @@ type UserCredentialRow = UserRow & { password_hash: string };
 
 export function authConfig(): AuthConfig {
   const demoMode = process.env.DEMO_MODE !== 'false';
+  const demoAccess = process.env.DEMO_ACCESS_ENABLED !== 'false';
   return {
     required: process.env.AUTH_REQUIRED === 'true',
     demoMode,
-    demoEmail: demoMode ? (process.env.DEMO_ADMIN_EMAIL ?? DEFAULT_DEMO_EMAIL) : null,
+    demoAccess,
+    demoEmail: demoAccess ? (process.env.DEMO_ADMIN_EMAIL ?? DEFAULT_DEMO_EMAIL) : null,
   };
 }
 

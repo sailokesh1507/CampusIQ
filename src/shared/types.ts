@@ -149,6 +149,7 @@ export interface AuthUser {
 export interface AuthConfig {
   required: boolean;
   demoMode: boolean;
+  demoAccess: boolean;
   demoEmail: string | null;
 }
 

@@ -78,9 +78,10 @@ With the default `DATABASE_DRIVER=sqlite`, the first server start creates `data/
 The backend now has an explicit operating-mode boundary:
 
 - `DEMO_MODE=true` (default locally) describes the synthetic demonstration mode. SQLite seeds it automatically; Postgres seeding is explicit through `POSTGRES_SEED_DEMO=true` so a production database cannot be populated accidentally.
-- `DEMO_MODE=false` prevents synthetic student seeding. A managed database and an explicit user-provisioning workflow are required before enabling this in a real institution.
+- `DEMO_MODE=false` marks the deployment as production mode. Synthetic records can remain as a clearly fictional demo institution, but every API workspace request requires a session when `AUTH_REQUIRED=true`.
 - `AUTH_REQUIRED=false` preserves the public hackathon demo flow.
 - `AUTH_REQUIRED=true` protects the API and activates the faculty login screen. The auth foundation uses opaque HttpOnly sessions, institution-scoped roles and Node `scrypt` password hashes on either database driver.
+- `DEMO_ACCESS_ENABLED=true` provides an explicit “Enter demo workspace” action that creates a session for the fictional demo institution; it does not make production data anonymous.
 
 Demo credentials are controlled by `DEMO_ADMIN_EMAIL` and `DEMO_ADMIN_PASSWORD`; never reuse them for a real institution.
 
@@ -101,8 +102,23 @@ $env:DATABASE_URL='postgres-connection-string'
 $env:DATABASE_SSL='true'
 $env:DEMO_MODE='false'
 $env:AUTH_REQUIRED='true'
+$env:DEMO_ACCESS_ENABLED='true'
 npm start
 ```
+
+Provision an institution administrator before giving a real institution access:
+
+```powershell
+$env:DATABASE_URL='postgres-connection-string'
+$env:PROVISION_INSTITUTION_NAME='Northbridge Institute'
+$env:PROVISION_INSTITUTION_SLUG='northbridge-institute'
+$env:PROVISION_ADMIN_EMAIL='admin@northbridge.example'
+$env:PROVISION_ADMIN_NAME='Northbridge Administrator'
+$env:PROVISION_ADMIN_PASSWORD='use-a-unique-12-character-password'
+npm run db:provision:admin
+```
+
+Users are linked to an institution when provisioned; email domains alone do not grant access or select an institution.
 
 ## Verification commands
 

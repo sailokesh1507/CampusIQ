@@ -24,6 +24,7 @@ describe('CampusIQ authentication foundation', () => {
     const base = await runningApp();
     const config = await (await fetch(`${base}/api/auth/config`)).json();
     expect(config.data.demoMode).toBe(true);
+    expect(config.data.demoAccess).toBe(true);
     expect(config.data.demoEmail).toBe('faculty@demo.campusiq.local');
 
     const login = await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'faculty@demo.campusiq.local', password: 'CampusIQ-demo-2026!' }) });
@@ -33,6 +34,9 @@ describe('CampusIQ authentication foundation', () => {
     const me = await (await fetch(`${base}/api/auth/me`, { headers: { cookie: cookie!.split(';')[0] } })).json();
     expect(me.data.user.email).toBe('faculty@demo.campusiq.local');
     expect(me.data.user.role).toBe('admin');
+
+    const demoAccess = await fetch(`${base}/api/auth/demo`, { method: 'POST' });
+    expect(demoAccess.status).toBe(200);
   });
 
   it('enforces authentication when production mode enables it', async () => {

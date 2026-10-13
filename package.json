@@ -20,6 +20,7 @@
     "test:watch": "vitest",
     "db:seed": "tsx src/db/seed.ts",
     "db:seed:postgres": "tsx scripts/seed-postgres.ts",
+    "db:provision:admin": "tsx scripts/provision-postgres-admin.ts",
     "db:migrate:postgres": "node scripts/migrate-postgres.mjs",
     "db:check:postgres": "node scripts/check-postgres.mjs",
     "smoke:postgres": "tsx scripts/smoke-postgres.ts",
